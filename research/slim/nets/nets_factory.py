@@ -26,6 +26,7 @@ from nets import cifarnet
 from nets import inception
 from nets import lenet
 from nets import mobilenet_v1
+from nets import mobilenet_v2
 from nets import overfeat
 from nets import resnet_v1
 from nets import resnet_v2
@@ -58,6 +59,10 @@ networks_map = {'alexnet_v2': alexnet.alexnet_v2,
                 'mobilenet_v1_075': mobilenet_v1.mobilenet_v1_075,
                 'mobilenet_v1_050': mobilenet_v1.mobilenet_v1_050,
                 'mobilenet_v1_025': mobilenet_v1.mobilenet_v1_025,
+                'mobilenet_v2': mobilenet_v2.mobilenet_v2,
+                'mobilenet_v2_075': mobilenet_v2.mobilenet_v2_075,
+                'mobilenet_v2_050': mobilenet_v2.mobilenet_v2_050,
+                'mobilenet_v2_025': mobilenet_v2.mobilenet_v2_025,
                 'nasnet_cifar': nasnet.build_nasnet_cifar,
                 'nasnet_mobile': nasnet.build_nasnet_mobile,
                 'nasnet_large': nasnet.build_nasnet_large,
@@ -88,13 +93,17 @@ arg_scopes_map = {'alexnet_v2': alexnet.alexnet_v2_arg_scope,
                   'mobilenet_v1_075': mobilenet_v1.mobilenet_v1_arg_scope,
                   'mobilenet_v1_050': mobilenet_v1.mobilenet_v1_arg_scope,
                   'mobilenet_v1_025': mobilenet_v1.mobilenet_v1_arg_scope,
+                  'mobilenet_v2': mobilenet_v2.mobilenet_v2_arg_scope,
+                  'mobilenet_v2_075': mobilenet_v2.mobilenet_v2_arg_scope,
+                  'mobilenet_v2_050': mobilenet_v2.mobilenet_v2_arg_scope,
+                  'mobilenet_v2_025': mobilenet_v2.mobilenet_v2_arg_scope,
                   'nasnet_cifar': nasnet.nasnet_cifar_arg_scope,
                   'nasnet_mobile': nasnet.nasnet_mobile_arg_scope,
                   'nasnet_large': nasnet.nasnet_large_arg_scope,
                  }
 
 
-def get_network_fn(name, num_classes, weight_decay=0.0, is_training=False):
+def get_network_fn(name, num_classes, weight_decay=0.0, is_training=False, precision=None, data_format=None):
   """Returns a network_fn such as `logits, end_points = network_fn(images)`.
 
   Args:

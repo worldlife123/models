@@ -196,3 +196,11 @@ def run(dataset_dir):
 
   _clean_up_temporary_files(dataset_dir)
   print('\nFinished converting the Cifar10 dataset!')
+  
+if __name__=="__main__":
+  import argparse
+  parser = argparse.ArgumentParser(description='Head pose estimation using the Hopenet network.')
+  parser.add_argument('--dataset_dir', dest='dataset_dir', help='path to dataset',
+            default="/tmp/cifar10", type=str)
+  args = parser.parse_args()
+  run(args.dataset_dir)

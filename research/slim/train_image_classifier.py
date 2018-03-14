@@ -216,9 +216,16 @@ tf.app.flags.DEFINE_string(
 tf.app.flags.DEFINE_boolean(
     'ignore_missing_vars', False,
     'When restoring a checkpoint would ignore missing variables.')
+    
+######################
+# Quantization Flags #
+######################
+tf.app.flags.DEFINE_boolean('quantize', False, 'Quantize training')
+
+tf.app.flags.DEFINE_integer('quantize_delay', 0,
+                            'Start quantization after n iterations.')
 
 FLAGS = tf.app.flags.FLAGS
-
 
 def _configure_learning_rate(num_samples_per_epoch, global_step):
   """Configures the learning rate.
@@ -466,6 +473,10 @@ def main(_):
             scope='aux_loss')
       slim.losses.softmax_cross_entropy(
           logits, labels, label_smoothing=FLAGS.label_smoothing, weights=1.0)
+          
+      if FLAGS.quantize:
+          tf.contrib.quantize.create_training_graph(quant_delay=FLAGS.quantize_delay)
+      
       return end_points
 
     # Gather initial summaries.
