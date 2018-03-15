@@ -419,8 +419,7 @@ def main(_):
         FLAGS.model_name,
         num_classes=(dataset.num_classes - FLAGS.labels_offset),
         weight_decay=FLAGS.weight_decay,
-        is_training=True,
-        use_dropout=False)
+        is_training=True)
 
     #####################################
     # Select the preprocessing function #
@@ -444,7 +443,7 @@ def main(_):
 
       train_image_size = FLAGS.train_image_size or network_fn.default_image_size
 
-      image, label = image_preprocessing_fn(image, train_image_size, train_image_size, bbox, landmark_2d)
+      image, label = image_preprocessing_fn(image, train_image_size, train_image_size, bbox=bbox, landmarks=landmark_2d)
 
       images, labels = tf.train.batch(
           [image, label],
@@ -462,7 +461,7 @@ def main(_):
     def clone_fn(batch_queue):
       """Allows data parallelism by creating multiple clones of network_fn."""
       images, labels = batch_queue.dequeue()
-      logits, end_points = network_fn(images)
+      logits, end_points = network_fn(images, use_dropout=False)
 
       #############################
       # Specify the loss function #
@@ -472,8 +471,8 @@ def main(_):
             end_points['AuxLogits'], labels,
             label_smoothing=FLAGS.label_smoothing, weights=0.4,
             scope='aux_loss')
-      slim.losses.softmax_cross_entropy(
-          logits, labels, label_smoothing=FLAGS.label_smoothing, weights=1.0)
+      tf.losses.absolute_difference(
+          logits, labels, weights=1.0)
           
       if FLAGS.quantize:
           tf.contrib.quantize.create_training_graph(quant_delay=FLAGS.quantize_delay)

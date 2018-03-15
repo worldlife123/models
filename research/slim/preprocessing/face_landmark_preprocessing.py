@@ -41,7 +41,7 @@ def apply_with_random_selector(x, func, num_cases):
       func(control_flow_ops.switch(x, tf.equal(sel, case))[1], case)
       for case in range(num_cases)])[0]
 
-def draw_landmarks(image, landmarks, scopr=None):
+def draw_landmarks(image, landmarks, scope=None):
   """Draw landmarks on an image. Landmarks should be an 1D-Tensor with format [x1,y1,x2,y2...]
 
   Args:
@@ -51,7 +51,10 @@ def draw_landmarks(image, landmarks, scopr=None):
   Returns:
     3-D Tensor color-distorted image on range [0, 1]
   """
-  return image
+  with tf.name_scope(scope, 'draw_landmarks', [image, landmarks]):
+    landmarks_2d = tf.transpose(tf.reshape(landmarks,[2,-1]))
+    pt2bboxes = tf.stack([landmark_2d[1]-0.01, landmark_2d[0]-0.01, landmark_2d[1]+0.01, landmark_2d[0]+0.01], axis=1)
+    return tf.image.draw_bounding_boxes(tf.expand_dims(image, 0), pt2bboxes, name)
 
 def distort_color(image, color_ordering=0, fast_mode=True, scope=None):
   """Distort the color of a Tensor image.
@@ -151,7 +154,7 @@ def distorted_bounding_box_crop(image,
     # the entire image.
     sample_distorted_bounding_box = tf.image.sample_distorted_bounding_box(
         tf.shape(image),
-        bounding_boxes=bbox,
+        bounding_boxes=tf.expand_dims(tf.expand_dims(bbox,0),0),
         min_object_covered=min_object_covered,
         aspect_ratio_range=aspect_ratio_range,
         area_range=area_range,
@@ -196,10 +199,8 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
     3-D float Tensor of distorted image used for training with range [0, 255].
   """
   with tf.name_scope(scope, 'distort_image', [image, height, width, bbox, landmarks]):
-    if bbox is None:
-      bbox = tf.constant([0.0, 0.0, 1.0, 1.0],
-                         dtype=tf.float32,
-                         shape=[1, 1, 4])
+    assert not (bbox is None or landmarks is None)
+    
     if image.dtype != tf.float32:
       image = tf.image.convert_image_dtype(image, dtype=tf.float32)
     # Each bounding box has shape [1, num_boxes, box coords] and
@@ -230,9 +231,13 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
         distorted_image,
         lambda x, method: tf.image.resize_images(x, [height, width], method),
         num_cases=num_resize_cases)
-    distorted_landmarks = 
-    pt2d[0,:] = (pt2d[0,:]-x_min)/abs(x_max - x_min)
-        pt2d[1,:] = (pt2d[1,:]-y_min)/abs(y_max - y_min)
+        
+    #convert landmarks to [0,1]
+    distorted_bbox = tf.reshape(distorted_bbox, [-1])
+    bb_begin = tf.gather(distorted_bbox, [0,1])
+    bb_size = tf.gather(distorted_bbox, [1,3]) - tf.gather(distorted_bbox, [0,2])
+    distorted_landmarks = (tf.reshape(distorted_landmarks,[2,-1]) - bb_begin) / tf.abs(bb_size)
+    distorted_landmarks = tf.reshape(distorted_landmarks,[-1])
 
     if add_image_summaries:
       tf.summary.image('cropped_resized_image',

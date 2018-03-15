@@ -71,9 +71,9 @@ def get_split(split_name, dataset_dir, file_pattern=None, reader=None):
       'image/encoded': tf.FixedLenFeature((), tf.string, default_value=''),
       'image/format': tf.FixedLenFeature((), tf.string, default_value='jpg'),
       'image/face/bbox': tf.FixedLenFeature(
-          [], tf.float, default_value=tf.zeros([], dtype=tf.float)),
+          [], tf.float32, default_value=tf.zeros([], dtype=tf.float32)),
       'image/face/landmark_2d': tf.FixedLenFeature(
-          [], tf.float, default_value=tf.zeros([], dtype=tf.float)),
+          [], tf.float32, default_value=tf.zeros([], dtype=tf.float32)),
   }
 
   items_to_handlers = {
