@@ -41,6 +41,17 @@ def apply_with_random_selector(x, func, num_cases):
       func(control_flow_ops.switch(x, tf.equal(sel, case))[1], case)
       for case in range(num_cases)])[0]
 
+def draw_landmarks(image, landmarks, scopr=None):
+  """Draw landmarks on an image. Landmarks should be an 1D-Tensor with format [x1,y1,x2,y2...]
+
+  Args:
+    image: 3-D Tensor containing single image in [0, 1].
+    landmarks: 1-D Tensor with format [x1,y1,x2,y2...], in which x,y in [0, 1] 
+    scope: Optional scope for name_scope.
+  Returns:
+    3-D Tensor color-distorted image on range [0, 1]
+  """
+  return image
 
 def distort_color(image, color_ordering=0, fast_mode=True, scope=None):
   """Distort the color of a Tensor image.
@@ -153,7 +164,8 @@ def distorted_bounding_box_crop(image,
     return cropped_image, distort_bbox
 
 
-def preprocess_for_train(image, height, width, bbox,
+def preprocess_for_train(image, height, width, bbox, landmarks,
+                         min_object_covered=0.6,
                          fast_mode=True,
                          scope=None,
                          add_image_summaries=True):
@@ -181,9 +193,9 @@ def preprocess_for_train(image, height, width, bbox,
     scope: Optional scope for name_scope.
     add_image_summaries: Enable image summaries.
   Returns:
-    3-D float Tensor of distorted image used for training with range [-1, 1].
+    3-D float Tensor of distorted image used for training with range [0, 255].
   """
-  with tf.name_scope(scope, 'distort_image', [image, height, width, bbox]):
+  with tf.name_scope(scope, 'distort_image', [image, height, width, bbox, landmarks]):
     if bbox is None:
       bbox = tf.constant([0.0, 0.0, 1.0, 1.0],
                          dtype=tf.float32,
@@ -197,7 +209,7 @@ def preprocess_for_train(image, height, width, bbox,
     if add_image_summaries:
       tf.summary.image('image_with_bounding_boxes', image_with_box)
 
-    distorted_image, distorted_bbox = distorted_bounding_box_crop(image, bbox)
+    distorted_image, distorted_bbox = distorted_bounding_box_crop(image, bbox, min_object_covered=min_object_covered)
     # Restore the shape since the dynamic slice based upon the bbox_size loses
     # the third dimension.
     distorted_image.set_shape([None, None, 3])
@@ -218,13 +230,16 @@ def preprocess_for_train(image, height, width, bbox,
         distorted_image,
         lambda x, method: tf.image.resize_images(x, [height, width], method),
         num_cases=num_resize_cases)
+    distorted_landmarks = 
+    pt2d[0,:] = (pt2d[0,:]-x_min)/abs(x_max - x_min)
+        pt2d[1,:] = (pt2d[1,:]-y_min)/abs(y_max - y_min)
 
     if add_image_summaries:
       tf.summary.image('cropped_resized_image',
                        tf.expand_dims(distorted_image, 0))
 
     # Randomly flip the image horizontally.
-    distorted_image = tf.image.random_flip_left_right(distorted_image)
+    #distorted_image = tf.image.random_flip_left_right(distorted_image)
 
     # Randomly distort the colors. There are 1 or 4 ways to do it.
     num_distort_cases = 1 if fast_mode else 4
@@ -236,11 +251,22 @@ def preprocess_for_train(image, height, width, bbox,
     if add_image_summaries:
       tf.summary.image('final_distorted_image',
                        tf.expand_dims(distorted_image, 0))
-    distorted_image = tf.subtract(distorted_image, 0.5)
-    distorted_image = tf.multiply(distorted_image, 2.0)
-    return distorted_image
+                       
+    #draw landmarks
+    if add_image_summaries:
+      distorted_image_with_lm = draw_landmarks(distorted_image, distorted_landmarks)
+      tf.summary.image('final_distorted_image_with_landmarks',
+                       tf.expand_dims(distorted_image_with_lm, 0))
+    
+    #distorted_image = tf.subtract(distorted_image, 0.5)
+    #distorted_image = tf.multiply(distorted_image, 2.0)
+    
+    #change range to [0.0, 255.0] for quantization
+    distorted_image = tf.multiply(distorted_image, 255.0)
+    distorted_landmarks = tf.multiply(distorted_landmarks, 255.0)
+    return distorted_image, distorted_landmarks
 
-
+#TODO
 def preprocess_for_eval(image, height, width,
                         central_fraction=0.875, scope=None):
   """Prepare one image for evaluation.
@@ -282,9 +308,8 @@ def preprocess_for_eval(image, height, width,
     return image
 
 
-def preprocess_image(image, height, width,
+def preprocess_image(image, height, width, bbox, landmarks,
                      is_training=False,
-                     bbox=None,
                      fast_mode=True,
                      add_image_summaries=True):
   """Pre-process one image for training or evaluation.
@@ -312,7 +337,7 @@ def preprocess_image(image, height, width,
     ValueError: if user does not provide bounding box
   """
   if is_training:
-    return preprocess_for_train(image, height, width, bbox, fast_mode,
+    return preprocess_for_train(image, height, width, bbox, landmarks, fast_mode,
                                 add_image_summaries=add_image_summaries)
   else:
     return preprocess_for_eval(image, height, width)

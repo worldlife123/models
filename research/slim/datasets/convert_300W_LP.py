@@ -90,11 +90,13 @@ def _get_filenames(dataset_dir, split_name):
 
   photo_filenames = []
   label_filenames = []
-  for directory in os.path.join(dataset_dir,folder_dict[split_name]):
-    for filename in os.listdir(directory):
+  for directory in folder_dict[split_name]:
+    full_directory = os.path.join(dataset_dir,directory)
+    for filename in os.listdir(full_directory):
       if filename[-4:]==".jpg":
-        photo_path = os.path.join(directory, filename[:-4])
+        photo_path = os.path.join(full_directory, filename)
         photo_filenames.append(photo_path)
+        label_filenames.append(os.path.join(dataset_dir, "landmarks", directory, filename[:-4] + "_pts.mat"))
 
   return photo_filenames, label_filenames
 
@@ -148,7 +150,7 @@ def _convert_dataset(split_name, photo_filenames, label_filenames, dataset_dir):
             y_max = max(pt2d[1,:])
 
             example = dataset_utils.image_to_tfexample_face_landmark(
-                image_data, b'jpg', height, width, [x_min, y_min, x_max, y_max], pt2d)
+                image_data, b'jpg', height, width, [x_min, y_min, x_max, y_max], list(pt2d.ravel()))
             tfrecord_writer.write(example.SerializeToString())
 
   sys.stdout.write('\n')
@@ -195,15 +197,15 @@ def run(dataset_dir):
   # Divide into train and test:
   random.seed(_RANDOM_SEED)
   #random.shuffle(photo_filenames)
-  training_filenames = _get_filenames(dataset_dir, 'train')
+  training_filenames, training_label_filenames = _get_filenames(dataset_dir, 'train')
   print("%d images for training" % len(training_filenames))
-  validation_filenames = _get_filenames(dataset_dir, 'validation')
+  validation_filenames, validation_label_filenames = _get_filenames(dataset_dir, 'validation')
   print("%d images for validation" % len(validation_filenames))
 
   # First, convert the training and validation sets.
-  _convert_dataset('train', training_filenames,
+  _convert_dataset('train', training_filenames, training_label_filenames,
                    dataset_dir)
-  _convert_dataset('validation', validation_filenames,
+  _convert_dataset('validation', validation_filenames, validation_label_filenames,
                    dataset_dir)
 
   # Finally, write the labels file:
@@ -212,3 +214,11 @@ def run(dataset_dir):
 
   _clean_up_temporary_files(dataset_dir)
   print('\nFinished converting the 300W_LP dataset!')
+  
+if __name__=="__main__":
+  import argparse
+  parser = argparse.ArgumentParser(description='convert 300W_LP dataset to tfrecord')
+  parser.add_argument('--dataset_dir', dest='dataset_dir', help='path to dataset',
+            default="/home/dff/NewDisk/300W_LP", type=str)
+  args = parser.parse_args()
+  run(args.dataset_dir)
