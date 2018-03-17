@@ -236,7 +236,7 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
     distorted_bbox = tf.reshape(distorted_bbox, [-1])
     bb_begin = tf.gather(distorted_bbox, [0,1])
     bb_size = tf.gather(distorted_bbox, [1,3]) - tf.gather(distorted_bbox, [0,2])
-    distorted_landmarks = (tf.reshape(distorted_landmarks,[2,-1]) - bb_begin) / tf.abs(bb_size)
+    distorted_landmarks = (tf.reshape(landmarks,[2,-1]) - bb_begin) / tf.abs(bb_size)
     distorted_landmarks = tf.reshape(distorted_landmarks,[-1])
 
     if add_image_summaries:

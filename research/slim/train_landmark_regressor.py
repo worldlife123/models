@@ -440,6 +440,11 @@ def main(_):
           common_queue_min=10 * FLAGS.batch_size)
       [image, bbox, landmark_2d] = provider.get(['image', 'bbox', 'landmark_2d'])
       #label -= FLAGS.labels_offset
+      with tf.Session():
+        print("session start")
+        print(image)
+        print(bbox.eval())
+        print(landmark_2d.eval())
 
       train_image_size = FLAGS.train_image_size or network_fn.default_image_size
 
