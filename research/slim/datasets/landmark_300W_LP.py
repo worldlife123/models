@@ -70,16 +70,16 @@ def get_split(split_name, dataset_dir, file_pattern=None, reader=None):
   keys_to_features = {
       'image/encoded': tf.FixedLenFeature((), tf.string, default_value=''),
       'image/format': tf.FixedLenFeature((), tf.string, default_value='jpg'),
-      'image/face/bbox': tf.FixedLenFeature(
-          [], tf.float32, default_value=tf.zeros([], dtype=tf.float32)),
-      'image/face/landmark_2d': tf.FixedLenFeature(
-          [], tf.float32, default_value=tf.zeros([], dtype=tf.float32)),
+      'image/face/bbox': tf.VarLenFeature(dtype=tf.float32), #tf.FixedLenFeature(
+          #[], tf.float32, default_value=tf.zeros([4], dtype=tf.float32)),
+      'image/face/landmark_2d': tf.VarLenFeature(dtype=tf.float32), #tf.FixedLenFeature(
+          #[], tf.float32, default_value=tf.zeros([136], dtype=tf.float32)),
   }
 
   items_to_handlers = {
       'image': slim.tfexample_decoder.Image(),
-      'bbox': slim.tfexample_decoder.Tensor('image/face/bbox'),
-      'landmark_2d': slim.tfexample_decoder.Tensor('image/face/landmark_2d'),
+      'bbox': slim.tfexample_decoder.Tensor('image/face/bbox', shape=[4]),
+      'landmark_2d': slim.tfexample_decoder.Tensor('image/face/landmark_2d', shape=[136]),
   }
 
   decoder = slim.tfexample_decoder.TFExampleDecoder(

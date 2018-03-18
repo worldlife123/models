@@ -144,13 +144,17 @@ def _convert_dataset(split_name, photo_filenames, label_filenames, dataset_dir):
 
             mat = sio.loadmat(label_filenames[i])
             pt2d = mat['pts_2d'].T
-            x_min = min(pt2d[0,:])
-            y_min = min(pt2d[1,:])
-            x_max = max(pt2d[0,:])
-            y_max = max(pt2d[1,:])
+            #convert to [0,1] and (y,x) for convenience
+            new_pt2d = pt2d.copy()
+            new_pt2d[0,:] = pt2d[1,:]/height
+            new_pt2d[1,:] = pt2d[0,:]/width
+            x_min = min(new_pt2d[0,:])
+            y_min = min(new_pt2d[1,:])
+            x_max = max(new_pt2d[0,:])
+            y_max = max(new_pt2d[1,:])
 
             example = dataset_utils.image_to_tfexample_face_landmark(
-                image_data, b'jpg', height, width, [x_min, y_min, x_max, y_max], list(pt2d.ravel()))
+                image_data, b'jpg', height, width, [y_min, x_min, y_max, x_max], list(new_pt2d.T.ravel()))
             tfrecord_writer.write(example.SerializeToString())
 
   sys.stdout.write('\n')

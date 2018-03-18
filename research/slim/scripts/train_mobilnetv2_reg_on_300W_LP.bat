@@ -1,5 +1,5 @@
 rem Where the pre-trained InceptionV1 checkpoint is saved to.
-SET PRETRAINED_CHECKPOINT_DIR=checkpoints\mobilenetv2_sgd
+SET PRETRAINED_CHECKPOINT_DIR=checkpoints\mobilenetv2_sgd\model.ckpt-1450000
 
 rem  Where the training (fine-tuned) checkpoint and logs will be saved to.
 SET TRAIN_DIR=%TEMP%\mobilenet_v2_training\
@@ -15,8 +15,8 @@ python train_landmark_regressor.py ^
   --dataset_dir=%DATASET_DIR% ^
   --model_name=mobilenet_v2 ^
   --preprocessing_name face_landmark ^
-  --checkpoint_path=%PRETRAINED_CHECKPOINT_DIR%\model.ckpt ^
-  --checkpoint_exclude_scopes=MobileNetV2/Logits ^
+  --checkpoint_path=%PRETRAINED_CHECKPOINT_DIR% ^
+  --checkpoint_exclude_scopes=MobilenetV2/Logits ^
   --max_number_of_steps=1000000 ^
   --batch_size=16 ^
   --learning_rate=0.00001 ^
@@ -24,6 +24,7 @@ python train_landmark_regressor.py ^
   --save_summaries_secs=60 ^
   --log_every_n_steps=100 ^
   --optimizer=adam ^
+  --clone_on_cpu=True ^
 rem  --weight_decay=0.00004
 
 rem pause

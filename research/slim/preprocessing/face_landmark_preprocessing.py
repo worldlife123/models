@@ -53,8 +53,8 @@ def draw_landmarks(image, landmarks, scope=None):
   """
   with tf.name_scope(scope, 'draw_landmarks', [image, landmarks]):
     landmarks_2d = tf.transpose(tf.reshape(landmarks,[2,-1]))
-    pt2bboxes = tf.stack([landmark_2d[1]-0.01, landmark_2d[0]-0.01, landmark_2d[1]+0.01, landmark_2d[0]+0.01], axis=1)
-    return tf.image.draw_bounding_boxes(tf.expand_dims(image, 0), pt2bboxes, name)
+    pt2bboxes = tf.stack([landmarks[1]-0.01, landmarks[0]-0.01, landmarks[1]+0.01, landmarks[0]+0.01], axis=-1)
+    return tf.image.draw_bounding_boxes(tf.expand_dims(image, 0), pt2bboxes, scope)
 
 def distort_color(image, color_ordering=0, fast_mode=True, scope=None):
   """Distort the color of a Tensor image.
@@ -188,9 +188,10 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
       int(8/16/32) data type (see `tf.image.convert_image_dtype` for details).
     height: integer
     width: integer
-    bbox: 3-D float Tensor of bounding boxes arranged [1, num_boxes, coords]
-      where each coordinate is [0, 1) and the coordinates are arranged
+    bbox: 1-D float Tensor of bounding box, the coordinates are arranged
       as [ymin, xmin, ymax, xmax].
+    landmarks: 1-D float Tensor of landmarks' coordinates, the coordinates are arranged
+      as [y1, x1, y2, x2, ..., y68, x68].
     fast_mode: Optional boolean, if True avoids slower transformations (i.e.
       bi-cubic resizing, random_hue or random_contrast).
     scope: Optional scope for name_scope.
@@ -203,6 +204,9 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
     
     if image.dtype != tf.float32:
       image = tf.image.convert_image_dtype(image, dtype=tf.float32)
+      
+    #convert bbox and landmarks to [0,1] coordinates
+    bbox
     # Each bounding box has shape [1, num_boxes, box coords] and
     # the coordinates are ordered [ymin, xmin, ymax, xmax].
     image_with_box = tf.image.draw_bounding_boxes(tf.expand_dims(image, 0),
@@ -231,12 +235,14 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
         distorted_image,
         lambda x, method: tf.image.resize_images(x, [height, width], method),
         num_cases=num_resize_cases)
-        
+    landmarks.set_shape([136]) #TODO: allow non-68 landmarks
+    
     #convert landmarks to [0,1]
     distorted_bbox = tf.reshape(distorted_bbox, [-1])
-    bb_begin = tf.gather(distorted_bbox, [0,1])
-    bb_size = tf.gather(distorted_bbox, [1,3]) - tf.gather(distorted_bbox, [0,2])
-    distorted_landmarks = (tf.reshape(landmarks,[2,-1]) - bb_begin) / tf.abs(bb_size)
+    distorted_landmarks = tf.reshape(landmarks,[2,-1])
+    bb_begin = tf.tile(tf.gather(distorted_bbox, [0,1]), tf.gather(tf.shape(distorted_landmarks),[1]))
+    bb_size = tf.tile(tf.abs(tf.gather(distorted_bbox, [2,3]) - tf.gather(distorted_bbox, [0,1])), tf.gather(tf.shape(distorted_landmarks),[1]))
+    distorted_landmarks = (distorted_landmarks - bb_begin) / bb_size
     distorted_landmarks = tf.reshape(distorted_landmarks,[-1])
 
     if add_image_summaries:
