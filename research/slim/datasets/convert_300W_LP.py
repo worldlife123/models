@@ -47,7 +47,7 @@ from datasets import dataset_utils
 _RANDOM_SEED = 0
 
 # The number of shards per dataset split.
-_NUM_SHARDS = 5
+_NUM_SHARDS = 1
 
 
 class ImageReader(object):
@@ -213,10 +213,10 @@ def run(dataset_dir):
                    dataset_dir)
 
   # Finally, write the labels file:
-  labels_to_class_names = dict(zip(range(len(class_names)), class_names))
-  dataset_utils.write_label_file(labels_to_class_names, dataset_dir)
+  #labels_to_class_names = dict(zip(range(len(class_names)), class_names))
+  #dataset_utils.write_label_file(labels_to_class_names, dataset_dir)
 
-  _clean_up_temporary_files(dataset_dir)
+  #_clean_up_temporary_files(dataset_dir)
   print('\nFinished converting the 300W_LP dataset!')
   
 if __name__=="__main__":

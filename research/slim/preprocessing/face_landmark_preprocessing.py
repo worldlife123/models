@@ -49,12 +49,12 @@ def draw_landmarks(image, landmarks, scope=None):
     landmarks: 1-D Tensor with format [x1,y1,x2,y2...], in which x,y in [0, 1] 
     scope: Optional scope for name_scope.
   Returns:
-    3-D Tensor color-distorted image on range [0, 1]
+    4-D Tensor color-distorted image on range [0, 1]
   """
   with tf.name_scope(scope, 'draw_landmarks', [image, landmarks]):
-    landmarks_2d = tf.transpose(tf.reshape(landmarks,[2,-1]))
-    pt2bboxes = tf.stack([landmarks[1]-0.01, landmarks[0]-0.01, landmarks[1]+0.01, landmarks[0]+0.01], axis=-1)
-    return tf.image.draw_bounding_boxes(tf.expand_dims(image, 0), pt2bboxes, scope)
+    landmarks_2d = tf.transpose(tf.reshape(landmarks,[-1,2]))
+    pt2bboxes = tf.stack([landmarks_2d[1]-0.01, landmarks_2d[0]-0.01, landmarks_2d[1]+0.01, landmarks_2d[0]+0.01], axis=1)
+    return tf.image.draw_bounding_boxes(tf.expand_dims(image, 0), tf.expand_dims(pt2bboxes,0), scope)
 
 def distort_color(image, color_ordering=0, fast_mode=True, scope=None):
   """Distort the color of a Tensor image.
@@ -206,11 +206,10 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
       image = tf.image.convert_image_dtype(image, dtype=tf.float32)
       
     #convert bbox and landmarks to [0,1] coordinates
-    bbox
     # Each bounding box has shape [1, num_boxes, box coords] and
     # the coordinates are ordered [ymin, xmin, ymax, xmax].
     image_with_box = tf.image.draw_bounding_boxes(tf.expand_dims(image, 0),
-                                                  bbox)
+                                                  tf.expand_dims(tf.expand_dims(bbox, 0), 0))
     if add_image_summaries:
       tf.summary.image('image_with_bounding_boxes', image_with_box)
 
@@ -239,11 +238,12 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
     
     #convert landmarks to [0,1]
     distorted_bbox = tf.reshape(distorted_bbox, [-1])
-    distorted_landmarks = tf.reshape(landmarks,[2,-1])
-    bb_begin = tf.tile(tf.gather(distorted_bbox, [0,1]), tf.gather(tf.shape(distorted_landmarks),[1]))
-    bb_size = tf.tile(tf.abs(tf.gather(distorted_bbox, [2,3]) - tf.gather(distorted_bbox, [0,1])), tf.gather(tf.shape(distorted_landmarks),[1]))
-    distorted_landmarks = (distorted_landmarks - bb_begin) / bb_size
-    distorted_landmarks = tf.reshape(distorted_landmarks,[-1])
+    #distorted_landmarks = tf.reshape(landmarks,[2,-1])
+    bb_begin = tf.tile(tf.gather(distorted_bbox, [0,1]), tf.div(tf.shape(landmarks),tf.constant(2)))
+    bb_size = tf.tile(tf.abs(tf.gather(distorted_bbox, [2,3]) - tf.gather(distorted_bbox, [0,1])), tf.div(tf.shape(landmarks),tf.constant(2)))
+    distorted_landmarks = (landmarks - bb_begin) / bb_size
+    #distorted_landmarks = tf.reshape(distorted_landmarks,[-1])
+
 
     if add_image_summaries:
       tf.summary.image('cropped_resized_image',
@@ -266,8 +266,7 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
     #draw landmarks
     if add_image_summaries:
       distorted_image_with_lm = draw_landmarks(distorted_image, distorted_landmarks)
-      tf.summary.image('final_distorted_image_with_landmarks',
-                       tf.expand_dims(distorted_image_with_lm, 0))
+      tf.summary.image('final_distorted_image_with_landmarks',distorted_image_with_lm)
     
     #distorted_image = tf.subtract(distorted_image, 0.5)
     #distorted_image = tf.multiply(distorted_image, 2.0)
