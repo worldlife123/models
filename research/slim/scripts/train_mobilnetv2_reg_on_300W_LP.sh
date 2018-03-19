@@ -14,14 +14,15 @@ python train_landmark_regressor.py \
   --dataset_split_name=train \
   --dataset_dir=${DATASET_DIR} \
   --model_name=mobilenet_v2 \
-  --preprocessing_name face_landmark\
-  --checkpoint_path=${PRETRAINED_CHECKPOINT_DIR}/model.ckpt \
-  --checkpoint_exclude_scopes=MobileNetV2/Logits \
-  --max_number_of_steps=1000000 \
+  --preprocessing_name face_landmark \
+  --max_number_of_steps=100000 \
   --batch_size=16 \
   --learning_rate=0.00001 \
-  --save_interval_secs=60 \
+  --learning_rate_decay_type=fixed \
+  --save_interval_secs=1800 \
   --save_summaries_secs=60 \
   --log_every_n_steps=100 \
   --optimizer=adam \
+  --checkpoint_path=${PRETRAINED_CHECKPOINT_DIR}/model.ckpt-1450000 \
+  --checkpoint_exclude_scopes=MobilenetV2/Logits \
 #  --weight_decay=0.00004

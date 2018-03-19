@@ -49,6 +49,8 @@ _RANDOM_SEED = 0
 # The number of shards per dataset split.
 _NUM_SHARDS = 1
 
+# Path to store event files for summary
+_PATH_EVENTS = 'events'
 
 class ImageReader(object):
   """Helper class that provides TensorFlow image coding utilities."""
@@ -69,6 +71,33 @@ class ImageReader(object):
     assert image.shape[2] == 3
     return image
 
+class ImageDrawer(object):
+  """Helper class that provides TensorFlow image drawing utilities."""
+
+  def __init__(self):
+    # Initializes function that prepares data.
+    self._image_data = tf.placeholder(dtype=tf.float32, shape=[None, None, 3])
+    self._bbox_data = tf.placeholder(dtype=tf.float32, shape=[4])
+    self._lm_data = tf.placeholder(dtype=tf.float32, shape=[136])
+    self._draw_bbox = tf.summary.image('image_with_bounding_boxes', 
+                                       tf.image.draw_bounding_boxes(tf.expand_dims(self._image_data, 0),
+                                                                    tf.expand_dims(tf.expand_dims(self._bbox_data, 0), 0)))
+    landmarks_2d = tf.transpose(tf.reshape(self._lm_data,[-1,2]))
+    pt2bboxes = tf.stack([landmarks_2d[0]-0.01, landmarks_2d[1]-0.01, landmarks_2d[0]+0.01, landmarks_2d[1]+0.01], axis=1)
+    self._draw_lm = tf.summary.image('image_with_landmarks', 
+                                     tf.image.draw_bounding_boxes(tf.expand_dims(self._image_data, 0), tf.expand_dims(pt2bboxes,0)))
+
+  def draw_bbox(self, sess, image_data, bbox):
+    image = sess.run(self._draw_bbox,
+                             feed_dict={self._image_data: image_data, self._bbox_data: bbox})
+    return image
+
+  def draw_lm(self, sess, image_data, lm):
+    image = sess.run(self._draw_lm,
+                     feed_dict={self._image_data: image_data, self._lm_data: lm})
+    #assert len(image.shape) == 3
+    #assert image.shape[2] == 3
+    return image
 
 def _get_filenames(dataset_dir, split_name):
   """Returns a list of filenames and inferred class names.
@@ -107,7 +136,7 @@ def _get_dataset_filename(dataset_dir, split_name, shard_id):
   return os.path.join(dataset_dir, output_filename)
 
 
-def _convert_dataset(split_name, photo_filenames, label_filenames, dataset_dir):
+def _convert_dataset(split_name, photo_filenames, label_filenames, dataset_dir, summary_writer=None):
   """Converts the given filenames to a TFRecord dataset.
 
   Args:
@@ -123,6 +152,7 @@ def _convert_dataset(split_name, photo_filenames, label_filenames, dataset_dir):
 
   with tf.Graph().as_default():
     image_reader = ImageReader()
+    image_drawer = ImageDrawer()
 
     with tf.Session('') as sess:
 
@@ -141,20 +171,30 @@ def _convert_dataset(split_name, photo_filenames, label_filenames, dataset_dir):
             # Read the filename:
             image_data = tf.gfile.FastGFile(photo_filenames[i], 'rb').read()
             height, width = image_reader.read_image_dims(sess, image_data)
-
+            
+            
             mat = sio.loadmat(label_filenames[i])
             pt2d = mat['pts_2d'].T
             #convert to [0,1] and (y,x) for convenience
             new_pt2d = pt2d.copy()
             new_pt2d[0,:] = pt2d[1,:]/height
             new_pt2d[1,:] = pt2d[0,:]/width
-            x_min = min(new_pt2d[0,:])
-            y_min = min(new_pt2d[1,:])
-            x_max = max(new_pt2d[0,:])
-            y_max = max(new_pt2d[1,:])
+            x_min = min(new_pt2d[1,:])
+            y_min = min(new_pt2d[0,:])
+            x_max = max(new_pt2d[1,:])
+            y_max = max(new_pt2d[0,:])
+            
+            bbox, landmarks = [y_min, x_min, y_max, x_max], list(new_pt2d.T.ravel())
+            
+            if summary_writer:
+              image = image_reader.decode_jpeg(sess, image_data)
+              image_with_box = image_drawer.draw_bbox(sess, image, bbox)
+              image_with_lm = image_drawer.draw_lm(sess, image, landmarks)
+              summary_writer.add_summary(image_with_box)
+              summary_writer.add_summary(image_with_lm)
 
             example = dataset_utils.image_to_tfexample_face_landmark(
-                image_data, b'jpg', height, width, [y_min, x_min, y_max, x_max], list(new_pt2d.T.ravel()))
+                image_data, b'jpg', height, width, bbox, landmarks)
             tfrecord_writer.write(example.SerializeToString())
 
   sys.stdout.write('\n')
@@ -167,11 +207,11 @@ def _clean_up_temporary_files(dataset_dir):
   Args:
     dataset_dir: The directory where the temporary files are stored.
   """
-  filename = _DATA_URL.split('/')[-1]
-  filepath = os.path.join(dataset_dir, filename)
-  tf.gfile.Remove(filepath)
+#  filename = _DATA_URL.split('/')[-1]
+#  filepath = os.path.join(dataset_dir, filename)
+#  tf.gfile.Remove(filepath)
 
-  tmp_dir = os.path.join(dataset_dir, 'flower_photos')
+  tmp_dir = os.path.join(dataset_dir, _PATH_EVENTS)
   tf.gfile.DeleteRecursively(tmp_dir)
 
 
@@ -185,21 +225,26 @@ def _dataset_exists(dataset_dir):
   return True
 
 
-def run(dataset_dir):
+def run(dataset_dir, add_image_summaries=False):
   """Runs the download and conversion operation.
 
   Args:
     dataset_dir: The dataset directory where the dataset is stored.
+    add_image_summaries: Whether to store events in dataset_dir/events directory
   """
-  if not tf.gfile.Exists(dataset_dir):
-    tf.gfile.MakeDirs(dataset_dir)
+  if add_image_summaries and not tf.gfile.Exists(os.path.join(dataset_dir, _PATH_EVENTS)):
+    tf.gfile.MakeDirs(os.path.join(dataset_dir, _PATH_EVENTS))
 
-  if _dataset_exists(dataset_dir):
-    print('Dataset files already exist. Exiting without re-creating them.')
-    return
+#  if _dataset_exists(dataset_dir):
+#    print('Dataset files already exist. Exiting without re-creating them.')
+#    return
+  
+  writer = None
+  if add_image_summaries:
+    writer = tf.summary.FileWriter(os.path.join(dataset_dir, _PATH_EVENTS))
 
   # Divide into train and test:
-  random.seed(_RANDOM_SEED)
+  #random.seed(_RANDOM_SEED)
   #random.shuffle(photo_filenames)
   training_filenames, training_label_filenames = _get_filenames(dataset_dir, 'train')
   print("%d images for training" % len(training_filenames))
@@ -208,15 +253,15 @@ def run(dataset_dir):
 
   # First, convert the training and validation sets.
   _convert_dataset('train', training_filenames, training_label_filenames,
-                   dataset_dir)
+                   dataset_dir, writer)
   _convert_dataset('validation', validation_filenames, validation_label_filenames,
-                   dataset_dir)
+                   dataset_dir, writer)
 
   # Finally, write the labels file:
   #labels_to_class_names = dict(zip(range(len(class_names)), class_names))
   #dataset_utils.write_label_file(labels_to_class_names, dataset_dir)
 
-  #_clean_up_temporary_files(dataset_dir)
+  _clean_up_temporary_files(dataset_dir)
   print('\nFinished converting the 300W_LP dataset!')
   
 if __name__=="__main__":
@@ -224,5 +269,7 @@ if __name__=="__main__":
   parser = argparse.ArgumentParser(description='convert 300W_LP dataset to tfrecord')
   parser.add_argument('--dataset_dir', dest='dataset_dir', help='path to dataset',
             default="/home/dff/NewDisk/300W_LP", type=str)
+  parser.add_argument('--add_summary', dest='add_summary', help='path to dataset',
+            default=False, type=bool)
   args = parser.parse_args()
-  run(args.dataset_dir)
+  run(args.dataset_dir, args.add_summary)

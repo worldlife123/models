@@ -98,7 +98,7 @@ tf.app.flags.DEFINE_float(
     'adam_beta2', 0.999,
     'The exponential decay rate for the 2nd moment estimates.')
 
-tf.app.flags.DEFINE_float('opt_epsilon', 1.0, 'Epsilon term for the optimizer.')
+tf.app.flags.DEFINE_float('opt_epsilon', 1.0e-8, 'Epsilon term for the optimizer.')
 
 tf.app.flags.DEFINE_float('ftrl_learning_rate_power', -0.5,
                           'The learning rate power.')
@@ -198,6 +198,10 @@ tf.app.flags.DEFINE_integer('max_number_of_steps', None,
 #####################
 # Fine-Tuning Flags #
 #####################
+
+tf.app.flags.DEFINE_boolean(
+    'fine_tune', False,
+    'Using latest_checkpoint as the start. If False, the checkpoint_path flag will be ignored if checkpoint exists in train_dir.') #not used
 
 tf.app.flags.DEFINE_string(
     'checkpoint_path', None,
@@ -440,8 +444,6 @@ def main(_):
           common_queue_min=10 * FLAGS.batch_size)
       [image, bbox, landmark_2d] = provider.get(['image', 'bbox', 'landmark_2d'])
       #label -= FLAGS.labels_offset
-      constant = tf.constant([1, 2, 3])
-      tensor = constant * constant
       #with tf.Session():
         #bbox.eval()
         #print(landmark_2d.eval())

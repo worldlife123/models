@@ -53,7 +53,7 @@ def draw_landmarks(image, landmarks, scope=None):
   """
   with tf.name_scope(scope, 'draw_landmarks', [image, landmarks]):
     landmarks_2d = tf.transpose(tf.reshape(landmarks,[-1,2]))
-    pt2bboxes = tf.stack([landmarks_2d[1]-0.01, landmarks_2d[0]-0.01, landmarks_2d[1]+0.01, landmarks_2d[0]+0.01], axis=1)
+    pt2bboxes = tf.stack([landmarks_2d[0]-0.01, landmarks_2d[1]-0.01, landmarks_2d[0]+0.01, landmarks_2d[1]+0.01], axis=1)
     return tf.image.draw_bounding_boxes(tf.expand_dims(image, 0), tf.expand_dims(pt2bboxes,0), scope)
 
 def distort_color(image, color_ordering=0, fast_mode=True, scope=None):
@@ -152,6 +152,11 @@ def distorted_bounding_box_crop(image,
     # allowed range of aspect ratios, sizes and overlap with the human-annotated
     # bounding box. If no box is supplied, then we assume the bounding box is
     # the entire image.
+#    bbox_x = bbox[3]-bbox[1]
+#    bbox_y = bbox[2]-bbox[0]
+#    expand_ratio = 2.0
+#    bbox_begin_expand = tf.constant(expand_ratio/4)
+#    bbox_size_expand = tf.constant(expand_ratio/2)
     sample_distorted_bounding_box = tf.image.sample_distorted_bounding_box(
         tf.shape(image),
         bounding_boxes=tf.expand_dims(tf.expand_dims(bbox,0),0),
@@ -161,6 +166,9 @@ def distorted_bounding_box_crop(image,
         max_attempts=max_attempts,
         use_image_if_no_bounding_boxes=True)
     bbox_begin, bbox_size, distort_bbox = sample_distorted_bounding_box
+
+#    bbox_begin = tf.gather(bbox, [0,1]) + tf.stack([tf.random_uniform([1], minval=-bbox_begin_expand*bbox_y, maxval=0), tf.random_uniform([1], minval=-bbox_begin_expand*bbox_x, maxval=0)])
+#    bbox_size = tf.stack([bbox_y+tf.random_uniform([1], minval=0, maxval=bbox_size_expand*bbox_y), bbox_x+tf.random_uniform([1], minval=0, maxval=bbox_size_expand*bbox_x)])
 
     # Crop the image to the specified bounding box.
     cropped_image = tf.slice(image, bbox_begin, bbox_size)
@@ -272,8 +280,8 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
     #distorted_image = tf.multiply(distorted_image, 2.0)
     
     #change range to [0.0, 255.0] for quantization
-    distorted_image = tf.multiply(distorted_image, 255.0)
-    distorted_landmarks = tf.multiply(distorted_landmarks, 255.0)
+    #distorted_image = tf.multiply(distorted_image, 255.0)
+    #distorted_landmarks = tf.multiply(distorted_landmarks, 255.0)
     return distorted_image, distorted_landmarks
 
 #TODO
