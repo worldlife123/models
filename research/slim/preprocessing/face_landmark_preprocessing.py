@@ -285,8 +285,10 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
     return distorted_image, distorted_landmarks
 
 #TODO
-def preprocess_for_eval(image, height, width,
-                        central_fraction=0.875, scope=None):
+def preprocess_for_eval(image, height, width, bbox, landmarks,
+                         min_object_covered=0.6,
+                         fast_mode=True,
+                         scope=None):
   """Prepare one image for evaluation.
 
   If height and width are specified it would output an image with that size by
@@ -310,20 +312,34 @@ def preprocess_for_eval(image, height, width,
   with tf.name_scope(scope, 'eval_image', [image, height, width]):
     if image.dtype != tf.float32:
       image = tf.image.convert_image_dtype(image, dtype=tf.float32)
-    # Crop the central region of the image with an area containing 87.5% of
-    # the original image.
-    if central_fraction:
-      image = tf.image.central_crop(image, central_fraction=central_fraction)
 
-    if height and width:
-      # Resize the image to the specified height and width.
-      image = tf.expand_dims(image, 0)
-      image = tf.image.resize_bilinear(image, [height, width],
-                                       align_corners=False)
-      image = tf.squeeze(image, [0])
-    image = tf.subtract(image, 0.5)
-    image = tf.multiply(image, 2.0)
-    return image
+    distorted_image, distorted_bbox = distorted_bounding_box_crop(image, bbox, min_object_covered=min_object_covered)
+    # Restore the shape since the dynamic slice based upon the bbox_size loses
+    # the third dimension.
+    distorted_image.set_shape([None, None, 3])
+
+    # This resizing operation may distort the images because the aspect
+    # ratio is not respected. We select a resize method in a round robin
+    # fashion based on the thread number.
+    # Note that ResizeMethod contains 4 enumerated resizing methods.
+
+    # We select only 1 case for fast_mode bilinear.
+    num_resize_cases = 1 if fast_mode else 4
+    distorted_image = apply_with_random_selector(
+        distorted_image,
+        lambda x, method: tf.image.resize_images(x, [height, width], method),
+        num_cases=num_resize_cases)
+    landmarks.set_shape([136]) #TODO: allow non-68 landmarks
+    
+    #convert landmarks to [0,1]
+    distorted_bbox = tf.reshape(distorted_bbox, [-1])
+    #distorted_landmarks = tf.reshape(landmarks,[2,-1])
+    bb_begin = tf.tile(tf.gather(distorted_bbox, [0,1]), tf.div(tf.shape(landmarks),tf.constant(2)))
+    bb_size = tf.tile(tf.abs(tf.gather(distorted_bbox, [2,3]) - tf.gather(distorted_bbox, [0,1])), tf.div(tf.shape(landmarks),tf.constant(2)))
+    distorted_landmarks = (landmarks - bb_begin) / bb_size
+    #distorted_landmarks = tf.reshape(distorted_landmarks,[-1])
+
+    return distorted_image, distorted_landmarks
 
 
 def preprocess_image(image, height, width, bbox, landmarks,
@@ -358,4 +374,4 @@ def preprocess_image(image, height, width, bbox, landmarks,
     return preprocess_for_train(image, height, width, bbox, landmarks, fast_mode,
                                 add_image_summaries=add_image_summaries)
   else:
-    return preprocess_for_eval(image, height, width)
+    return preprocess_for_eval(image, height, width, bbox, landmarks)
