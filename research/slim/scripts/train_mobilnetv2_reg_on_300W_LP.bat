@@ -20,8 +20,9 @@ python train_landmark_regressor.py ^
   --max_number_of_steps=1000000 ^
   --batch_size=16 ^
   --learning_rate=0.00001 ^
-  --save_interval_secs=600 ^
-  --save_summaries_secs=600 ^
+  --learning_rate_decay_type=fixed ^
+  --save_interval_secs=1800 ^
+  --save_summaries_secs=60 ^
   --log_every_n_steps=100 ^
   --optimizer=adam ^
   --clone_on_cpu=True ^

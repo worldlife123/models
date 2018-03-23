@@ -174,6 +174,21 @@ def distorted_bounding_box_crop(image,
     cropped_image = tf.slice(image, bbox_begin, bbox_size)
     return cropped_image, distort_bbox
 
+def expand_bounding_box_crop_resize(image, height, width, bbox, expand_ratio=1.8, scope=None):
+	with tf.name_scope(scope, 'expand_bounding_box_crop_resize', [image, height, width, bbox]):
+		#expand bbox randomly
+		bbox_size = tf.gather(bbox, [2,3]) - tf.gather(bbox, [0,1])
+		rd_expand = tf.reshape(tf.stack([tf.random_uniform([1], minval=-bbox_size[0]*expand_ratio/4, maxval=0),
+							tf.random_uniform([1], minval=-bbox_size[1]*expand_ratio/4, maxval=0),
+							tf.random_uniform([1], minval=0, maxval=bbox_size[0]*expand_ratio/4),
+							tf.random_uniform([1], minval=0, maxval=bbox_size[1]*expand_ratio/4)]), [-1])
+		expand_bbox = bbox + rd_expand
+		cropped_image = tf.image.crop_and_resize(tf.expand_dims(image, 0),
+												tf.expand_dims(expand_bbox, 0),
+												[0],
+												tf.constant([height,width], dtype=tf.int32),
+												extrapolation_value=0)[-1] #remove batch
+		return cropped_image, expand_bbox
 
 def preprocess_for_train(image, height, width, bbox, landmarks,
                          min_object_covered=0.6,
@@ -221,12 +236,14 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
     if add_image_summaries:
       tf.summary.image('image_with_bounding_boxes', image_with_box)
 
-    distorted_image, distorted_bbox = distorted_bounding_box_crop(image, bbox, min_object_covered=min_object_covered)
+    bbox.set_shape([4])
+
+    distorted_image, distorted_bbox = expand_bounding_box_crop_resize(image, height, width, bbox)#distorted_bounding_box_crop(image, bbox, min_object_covered=min_object_covered)
     # Restore the shape since the dynamic slice based upon the bbox_size loses
     # the third dimension.
     distorted_image.set_shape([None, None, 3])
     image_with_distorted_box = tf.image.draw_bounding_boxes(
-        tf.expand_dims(image, 0), distorted_bbox)
+        tf.expand_dims(image, 0), tf.expand_dims(tf.expand_dims((distorted_bbox), 0), 0))
     if add_image_summaries:
       tf.summary.image('images_with_distorted_bounding_box',
                        image_with_distorted_box)
@@ -245,7 +262,7 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
     landmarks.set_shape([136]) #TODO: allow non-68 landmarks
     
     #convert landmarks to [0,1]
-    distorted_bbox = tf.reshape(distorted_bbox, [-1])
+    #distorted_bbox = tf.reshape(distorted_bbox, [-1])
     #distorted_landmarks = tf.reshape(landmarks,[2,-1])
     bb_begin = tf.tile(tf.gather(distorted_bbox, [0,1]), tf.div(tf.shape(landmarks),tf.constant(2)))
     bb_size = tf.tile(tf.abs(tf.gather(distorted_bbox, [2,3]) - tf.gather(distorted_bbox, [0,1])), tf.div(tf.shape(landmarks),tf.constant(2)))
@@ -284,7 +301,6 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
     #distorted_landmarks = tf.multiply(distorted_landmarks, 255.0)
     return distorted_image, distorted_landmarks
 
-#TODO
 def preprocess_for_eval(image, height, width, bbox, landmarks,
                          min_object_covered=0.6,
                          fast_mode=True,
@@ -313,10 +329,17 @@ def preprocess_for_eval(image, height, width, bbox, landmarks,
     if image.dtype != tf.float32:
       image = tf.image.convert_image_dtype(image, dtype=tf.float32)
 
-    distorted_image, distorted_bbox = distorted_bounding_box_crop(image, bbox, min_object_covered=min_object_covered)
+    bbox.set_shape([4])
+
+    distorted_image, distorted_bbox = expand_bounding_box_crop_resize(image, height, width, bbox)#distorted_bounding_box_crop(image, bbox, min_object_covered=min_object_covered)
     # Restore the shape since the dynamic slice based upon the bbox_size loses
     # the third dimension.
     distorted_image.set_shape([None, None, 3])
+    image_with_distorted_box = tf.image.draw_bounding_boxes(
+        tf.expand_dims(image, 0), tf.expand_dims(tf.expand_dims((distorted_bbox), 0), 0))
+    if add_image_summaries:
+      tf.summary.image('images_with_distorted_bounding_box',
+                       image_with_distorted_box)
 
     # This resizing operation may distort the images because the aspect
     # ratio is not respected. We select a resize method in a round robin
@@ -332,7 +355,7 @@ def preprocess_for_eval(image, height, width, bbox, landmarks,
     landmarks.set_shape([136]) #TODO: allow non-68 landmarks
     
     #convert landmarks to [0,1]
-    distorted_bbox = tf.reshape(distorted_bbox, [-1])
+    #distorted_bbox = tf.reshape(distorted_bbox, [-1])
     #distorted_landmarks = tf.reshape(landmarks,[2,-1])
     bb_begin = tf.tile(tf.gather(distorted_bbox, [0,1]), tf.div(tf.shape(landmarks),tf.constant(2)))
     bb_size = tf.tile(tf.abs(tf.gather(distorted_bbox, [2,3]) - tf.gather(distorted_bbox, [0,1])), tf.div(tf.shape(landmarks),tf.constant(2)))
