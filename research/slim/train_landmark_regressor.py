@@ -229,6 +229,12 @@ tf.app.flags.DEFINE_boolean('quantize', False, 'Quantize training')
 tf.app.flags.DEFINE_integer('quantize_delay', 0,
                             'Start quantization after n iterations.')
 
+####################
+# GPU Config Flags #
+####################
+tf.app.flags.DEFINE_float('gpu_memory_fraction', 0.5,
+                            'GPU memory to take for training session. 1.0 stand for full use.')
+
 FLAGS = tf.app.flags.FLAGS
 
 def _configure_learning_rate(num_samples_per_epoch, global_step):
@@ -581,6 +587,7 @@ def main(_):
         is_chief=(FLAGS.task == 0),
         init_fn=_get_init_fn(),
         summary_op=summary_op,
+        session_config=tf.ConfigProto(gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=FLAGS.gpu_memory_fraction)),
         number_of_steps=FLAGS.max_number_of_steps,
         log_every_n_steps=FLAGS.log_every_n_steps,
         save_summaries_secs=FLAGS.save_summaries_secs,

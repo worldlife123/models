@@ -81,6 +81,20 @@ tf.app.flags.DEFINE_integer(
 
 FLAGS = tf.app.flags.FLAGS
 
+def draw_landmarks(image, landmarks, scope=None):
+  """Draw landmarks on an image. Landmarks should be an 1D-Tensor with format [x1,y1,x2,y2...]
+
+  Args:
+    image: 3-D Tensor containing single image in [0, 1].
+    landmarks: 1-D Tensor with format [x1,y1,x2,y2...], in which x,y in [0, 1] 
+    scope: Optional scope for name_scope.
+  Returns:
+    4-D Tensor color-distorted image on range [0, 1]
+  """
+  with tf.name_scope(scope, 'draw_landmarks', [image, landmarks]):
+    landmarks_2d = tf.transpose(tf.reshape(landmarks,[-1,2]))
+    pt2bboxes = tf.stack([landmarks_2d[0]-0.01, landmarks_2d[1]-0.01, landmarks_2d[0]+0.01, landmarks_2d[1]+0.01], axis=1)
+    return tf.image.draw_bounding_boxes(tf.expand_dims(image, 0), tf.expand_dims(pt2bboxes,0), scope)
 
 def main(_):
   if not FLAGS.dataset_dir:
@@ -148,6 +162,7 @@ def main(_):
       variables_to_restore = slim.get_variables_to_restore()
 
     predictions = logits#tf.argmax(logits, 1)
+    tf.summary.image('result', draw_landmarks(image, predictions))
     #labels = tf.squeeze(labels)
 
     # Define the metrics:

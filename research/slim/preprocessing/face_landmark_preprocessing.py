@@ -174,24 +174,25 @@ def distorted_bounding_box_crop(image,
     cropped_image = tf.slice(image, bbox_begin, bbox_size)
     return cropped_image, distort_bbox
 
-def expand_bounding_box_crop_resize(image, height, width, bbox, expand_ratio=1.8, scope=None):
-	with tf.name_scope(scope, 'expand_bounding_box_crop_resize', [image, height, width, bbox]):
-		#expand bbox randomly
-		bbox_size = tf.gather(bbox, [2,3]) - tf.gather(bbox, [0,1])
-		rd_expand = tf.reshape(tf.stack([tf.random_uniform([1], minval=-bbox_size[0]*expand_ratio/4, maxval=0),
-							tf.random_uniform([1], minval=-bbox_size[1]*expand_ratio/4, maxval=0),
-							tf.random_uniform([1], minval=0, maxval=bbox_size[0]*expand_ratio/4),
-							tf.random_uniform([1], minval=0, maxval=bbox_size[1]*expand_ratio/4)]), [-1])
-		expand_bbox = bbox + rd_expand
-		cropped_image = tf.image.crop_and_resize(tf.expand_dims(image, 0),
-												tf.expand_dims(expand_bbox, 0),
-												[0],
-												tf.constant([height,width], dtype=tf.int32),
-												extrapolation_value=0)[-1] #remove batch
-		return cropped_image, expand_bbox
+def expand_bounding_box_crop_resize(image, height, width, bbox, expand_range=(1.2, 2.0), scope=None):
+    with tf.name_scope(scope, 'expand_bounding_box_crop_resize', [image, height, width, bbox]):
+        #expand bbox randomly
+        bbox_size = tf.gather(bbox, [2,3]) - tf.gather(bbox, [0,1])
+        expand_min, expand_max = (expand_range[0]-1)/2, (expand_range[1]-1)/2
+        rd_expand = tf.reshape(tf.stack([tf.random_uniform([1], minval=-bbox_size[0]*expand_max, maxval=-bbox_size[0]*expand_min),
+                                         tf.random_uniform([1], minval=-bbox_size[1]*expand_max, maxval=-bbox_size[1]*expand_min),
+                                         tf.random_uniform([1], minval=bbox_size[0]*expand_min, maxval=bbox_size[0]*expand_max),
+                                         tf.random_uniform([1], minval=bbox_size[1]*expand_min, maxval=bbox_size[1]*expand_max)]), [-1])
+        expand_bbox = bbox + rd_expand
+        cropped_image = tf.image.crop_and_resize(tf.expand_dims(image, 0),
+                                                tf.expand_dims(expand_bbox, 0),
+                                                [0],
+                                                tf.constant([height,width], dtype=tf.int32),
+                                                extrapolation_value=0)[-1] #remove batch
+        return cropped_image, expand_bbox
 
 def preprocess_for_train(image, height, width, bbox, landmarks,
-                         min_object_covered=0.6,
+                         expand_range=(1.2, 2.0),
                          fast_mode=True,
                          scope=None,
                          add_image_summaries=True):
@@ -238,7 +239,10 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
 
     bbox.set_shape([4])
 
-    distorted_image, distorted_bbox = expand_bounding_box_crop_resize(image, height, width, bbox)#distorted_bounding_box_crop(image, bbox, min_object_covered=min_object_covered)
+    distorted_image, distorted_bbox = expand_bounding_box_crop_resize(image, height, width, bbox,
+                                                                      expand_range=expand_range)
+    #distorted_bounding_box_crop(image, bbox, min_object_covered=min_object_covered)
+    
     # Restore the shape since the dynamic slice based upon the bbox_size loses
     # the third dimension.
     distorted_image.set_shape([None, None, 3])
@@ -337,9 +341,6 @@ def preprocess_for_eval(image, height, width, bbox, landmarks,
     distorted_image.set_shape([None, None, 3])
     image_with_distorted_box = tf.image.draw_bounding_boxes(
         tf.expand_dims(image, 0), tf.expand_dims(tf.expand_dims((distorted_bbox), 0), 0))
-    if add_image_summaries:
-      tf.summary.image('images_with_distorted_bounding_box',
-                       image_with_distorted_box)
 
     # This resizing operation may distort the images because the aspect
     # ratio is not respected. We select a resize method in a round robin
@@ -394,7 +395,7 @@ def preprocess_image(image, height, width, bbox, landmarks,
     ValueError: if user does not provide bounding box
   """
   if is_training:
-    return preprocess_for_train(image, height, width, bbox, landmarks, fast_mode,
+    return preprocess_for_train(image, height, width, bbox, landmarks, fast_mode=fast_mode,
                                 add_image_summaries=add_image_summaries)
   else:
     return preprocess_for_eval(image, height, width, bbox, landmarks)
