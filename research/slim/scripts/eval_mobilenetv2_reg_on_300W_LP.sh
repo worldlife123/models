@@ -1,5 +1,5 @@
 # Where the pre-trained InceptionV1 checkpoint is saved to.
-PRETRAINED_CHECKPOINT_DIR=/tmp/mobilenet_v2_training_2/
+PRETRAINED_CHECKPOINT_DIR=/tmp/mobilenet_v2_training/
 
 # Where the training (fine-tuned) checkpoint and logs will be saved to.
 EVAL_DIR=/tmp/mobilenet_v2_eval/
@@ -17,5 +17,3 @@ python eval_landmark_regressor.py \
   --preprocessing_name face_landmark \
   --batch_size=1 \
   --checkpoint_path=${PRETRAINED_CHECKPOINT_DIR} \
-  --checkpoint_exclude_scopes=MobilenetV2/Logits \
-#  --weight_decay=0.00004

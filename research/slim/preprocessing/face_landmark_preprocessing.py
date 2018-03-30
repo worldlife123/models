@@ -399,3 +399,4 @@ def preprocess_image(image, height, width, bbox, landmarks,
                                 add_image_summaries=add_image_summaries)
   else:
     return preprocess_for_eval(image, height, width, bbox, landmarks)
+

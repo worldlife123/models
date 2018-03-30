@@ -23,6 +23,7 @@ from datasets import flowers
 from datasets import imagenet
 from datasets import mnist
 from datasets import landmark_300W_LP
+from datasets import landmark_300VW
 
 datasets_map = {
     'cifar10': cifar10,
@@ -30,6 +31,7 @@ datasets_map = {
     'imagenet': imagenet,
     'mnist': mnist,
     'landmark_300W_LP': landmark_300W_LP,
+    'landmark_300VW': landmark_300VW,
 }
 
 

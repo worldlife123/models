@@ -125,3 +125,26 @@ bazel run tensorflow/tools/graph_transforms:transform_graph -- \
 echo "*******"
 echo "Saved graphs to ${MODEL_FOLDER}/frozen_graph.pb and ${MODEL_FOLDER}/quantized_graph.pb"
 echo "*******"
+
+echo "Exporting tflite model to ${MODEL_FOLDER}/lite_model.tflite"
+bazel run tensorflow/contrib/lite/toco:toco -- \
+  --input_file=${MODEL_FOLDER}/frozen_graph.pb \
+  --input_format=TENSORFLOW_GRAPHDEF \
+  --output_format=TFLITE \
+  --output_file=${MODEL_FOLDER}/lite_model.tflite \
+  --inference_type=FLOAT \
+  --inference_input_type=FLOAT --input_arrays=input \
+  --output_arrays=MobilenetV2/Predictions/Reshape_1 \
+  --input_shapes=1,224,224,3
+  
+#TODO: do not work!
+echo "Exporting quantized tflite model to ${MODEL_FOLDER}/lite_model_quantized.tflite"
+bazel run tensorflow/contrib/lite/toco:toco -- \
+  --input_file=${MODEL_FOLDER}/quantized_graph.pb \
+  --input_format=TENSORFLOW_GRAPHDEF \
+  --output_format=TFLITE \
+  --output_file=${MODEL_FOLDER}/lite_model_quantized.tflite \
+  --inference_type=QUANTIZED_UINT8 \
+  --inference_input_type=QUANTIZED_UINT8 --input_arrays=input \
+  --output_arrays=MobilenetV2/Predictions/Reshape_1 \
+  --input_shapes=1,224,224,3

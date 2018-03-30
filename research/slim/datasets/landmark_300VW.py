@@ -27,9 +27,9 @@ from datasets import dataset_utils
 
 slim = tf.contrib.slim
 
-_FILE_PATTERN = 'landmark_300W_LP_%s_*.tfrecord'
+_FILE_PATTERN = 'landmark_300VW_%s_*.tfrecord'
 
-SPLITS_TO_SIZES = {'train': 59439, 'validation': 1786}
+SPLITS_TO_SIZES = {'train': 95192, 'validation_1': 62846, 'validation_2': 32872, 'validation_3': 27687}
 
 _NUM_CLASSES = 136
 
