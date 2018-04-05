@@ -474,7 +474,10 @@ def main(_):
     def clone_fn(batch_queue):
       """Allows data parallelism by creating multiple clones of network_fn."""
       images, labels = batch_queue.dequeue()
-      logits, end_points = network_fn(images, use_dropout=False)
+      logits, end_points = network_fn(images, use_dropout=False, prediction_fn=None)
+      
+      if FLAGS.quantize:
+          tf.contrib.quantize.create_training_graph(quant_delay=FLAGS.quantize_delay)
 
       #############################
       # Specify the loss function #
@@ -484,11 +487,9 @@ def main(_):
             end_points['AuxLogits'], labels,
             label_smoothing=FLAGS.label_smoothing, weights=0.4,
             scope='aux_loss')
+            
       tf.losses.absolute_difference(
           logits, labels, weights=1.0)
-          
-      if FLAGS.quantize:
-          tf.contrib.quantize.create_training_graph(quant_delay=FLAGS.quantize_delay)
       
       return end_points
 

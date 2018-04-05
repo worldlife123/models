@@ -95,6 +95,10 @@ tf.app.flags.DEFINE_string(
 
 tf.app.flags.DEFINE_string(
     'dataset_dir', '', 'Directory to save intermediate dataset files to')
+    
+tf.app.flags.DEFINE_boolean(
+    'quantize', False,
+    'Whether to export quantized model.')
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -115,6 +119,9 @@ def main(_):
                                  shape=[FLAGS.batch_size, image_size,
                                         image_size, 3])
     network_fn(placeholder)
+    if FLAGS.quantize:
+        if FLAGS.is_training: tf.contrib.quantize.create_training_graph()
+        else: tf.contrib.quantize.create_eval_graph()
     graph_def = graph.as_graph_def()
     with gfile.GFile(FLAGS.output_file, 'wb') as f:
       f.write(graph_def.SerializeToString())

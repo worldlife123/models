@@ -48,8 +48,7 @@ def _inverted_residual_bottleneck(inputs, depth, stride, expand_ratio, scope=Non
     output = slim.separable_conv2d(output, None, 3, depth_multiplier=1, stride=stride,
                               activation_fn=tf.nn.relu6, normalizer_fn=slim.batch_norm, scope='depthwise')
     output = slim.conv2d(output, depth, 1, stride=1,
-                              activation_fn=None, normalizer_fn=slim.batch_norm, scope='pointwise')
-
+                              activation_fn=tf.identity, normalizer_fn=slim.batch_norm, scope='pointwise')#add an activation_fn to avoid quantize error on batchnorm
     if stride==1 and depth==depth_in:
       shortcut = inputs
       output = shortcut + output

@@ -1,5 +1,5 @@
 # Where the pre-trained InceptionV1 checkpoint is saved to.
-PRETRAINED_CHECKPOINT_DIR=/tmp/mobilenet_v2_training/
+PRETRAINED_CHECKPOINT_DIR=/tmp/mobilenet_v2_training_4/
 
 # Where the training (fine-tuned) checkpoint and logs will be saved to.
 EVAL_DIR=/tmp/mobilenet_v2_eval/

@@ -1,8 +1,8 @@
 # Where the pre-trained InceptionV1 checkpoint is saved to.
-PRETRAINED_CHECKPOINT_DIR=/tmp/mobilenet_v2_training_2/
+PRETRAINED_CHECKPOINT_DIR=/tmp/mobilenet_v2_training_3/
 
 # Where the training (fine-tuned) checkpoint and logs will be saved to.
-TRAIN_DIR=/tmp/mobilenet_v2_training_2/ft
+TRAIN_DIR=/tmp/mobilenet_v2_training_3/ft
 
 # Where the dataset is saved to.
 DATASET_DIR=/home/dff/NewDisk/300VW
@@ -19,7 +19,7 @@ python train_landmark_regressor.py \
   --batch_size=32 \
   --learning_rate=0.000001 \
   --learning_rate_decay_type=fixed \
-  --weight_decay=0.0004 \
+  --weight_decay=0.00004 \
   --save_interval_secs=1800 \
   --save_summaries_secs=60 \
   --log_every_n_steps=100 \

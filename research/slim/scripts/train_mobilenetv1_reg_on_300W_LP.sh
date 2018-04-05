@@ -2,7 +2,7 @@
 PRETRAINED_CHECKPOINT_DIR=checkpoints/mobilenetv2_sgd
 
 # Where the training (fine-tuned) checkpoint and logs will be saved to.
-TRAIN_DIR=/tmp/mobilenet_v2_training_5/
+TRAIN_DIR=/tmp/mobilenet_v1_training/
 
 # Where the dataset is saved to.
 DATASET_DIR=/home/dff/NewDisk/300W_LP
@@ -13,7 +13,7 @@ python train_landmark_regressor.py \
   --dataset_name=landmark_300W_LP \
   --dataset_split_name=train \
   --dataset_dir=${DATASET_DIR} \
-  --model_name=mobilenet_v2 \
+  --model_name=mobilenet_v1 \
   --preprocessing_name face_landmark \
   --max_number_of_steps=100000 \
   --batch_size=16 \
@@ -24,7 +24,9 @@ python train_landmark_regressor.py \
   --save_summaries_secs=60 \
   --log_every_n_steps=100 \
   --optimizer=adam \
-  --checkpoint_path=${PRETRAINED_CHECKPOINT_DIR}/model.ckpt-1450000 \
-  --checkpoint_exclude_scopes=MobilenetV2/Logits \
+  --quantize=True \
+  --quantize_delay=0 \
+#  --checkpoint_path=${PRETRAINED_CHECKPOINT_DIR}/model.ckpt-1450000 \
+#  --checkpoint_exclude_scopes=MobilenetV1/Logits \
 #  --end_learning_rate=0.00001 \
 
