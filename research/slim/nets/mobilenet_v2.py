@@ -48,14 +48,34 @@ def _inverted_residual_bottleneck(inputs, depth, stride, expand_ratio, scope=Non
     output = slim.separable_conv2d(output, None, 3, depth_multiplier=1, stride=stride,
                               activation_fn=tf.nn.relu6, normalizer_fn=slim.batch_norm, scope='depthwise')
     output = slim.conv2d(output, depth, 1, stride=1,
+                              activation_fn=None, normalizer_fn=slim.batch_norm, scope='pointwise')#add an activation_fn to avoid quantize error on batchnorm
+    if stride==1 and depth==depth_in:
+      shortcut = inputs
+      output = shortcut + output
+      #output = tf.identity(output) #adding an activation_fn enable quantization ??
+    
+    output = tf.identity(output)
+    
+    return output
+
+@slim.add_arg_scope
+def _inverted_residual_bottleneck_relu6(inputs, depth, stride, expand_ratio, scope=None):
+  with tf.variable_scope(scope, 'InvertedResidual', [inputs]) as sc:
+    depth_in = slim.utils.last_dimension(inputs.get_shape(), min_rank=4)
+    output = slim.conv2d(inputs, expand_ratio*inputs.get_shape().as_list()[-1], 1, stride=1,
+                              activation_fn=tf.nn.relu6, normalizer_fn=slim.batch_norm, scope='conv')
+    output = slim.separable_conv2d(output, None, 3, depth_multiplier=1, stride=stride,
+                              activation_fn=tf.nn.relu6, normalizer_fn=slim.batch_norm, scope='depthwise')
+    output = slim.conv2d(output, depth, 1, stride=1,
                               activation_fn=tf.identity, normalizer_fn=slim.batch_norm, scope='pointwise')#add an activation_fn to avoid quantize error on batchnorm
     if stride==1 and depth==depth_in:
       shortcut = inputs
       output = shortcut + output
-
+      #output = tf.identity(output) #adding an activation_fn enable quantization ??
+    
+    output = tf.nn.relu6(output)
+    
     return output
-
-
 
 def mobilenet_v2_base(inputs,
                       final_endpoint='Conv2d_8',
@@ -248,8 +268,8 @@ def mobilenet_v2(inputs,
         logits = slim.conv2d(net, num_classes, [1, 1], activation_fn=None,
                              normalizer_fn=None, scope='Conv2d_1c_1x1')
         if spatial_squeeze:
-          #logits = tf.squeeze(logits, [1, 2], name='SpatialSqueeze') #tflite do not like squeeze
-          logits = tf.reshape(logits, [-1, num_classes], name='Reshape')
+          logits = tf.squeeze(logits, [1, 2], name='SpatialSqueeze') #tflite do not like squeeze??
+          #logits = tf.reshape(logits, [-1, num_classes], name='Reshape')
       end_points['Logits'] = logits
       if prediction_fn:
         end_points['Predictions'] = prediction_fn(logits, scope='Predictions')
@@ -294,7 +314,7 @@ def _reduced_kernel_size_for_small_input(input_tensor, kernel_size):
 def mobilenet_v2_arg_scope(is_training=True,
                            weight_decay=0.00004,
                            stddev=0.09,
-                           regularize_depthwise=False):
+                           regularize_depthwise=True): #change to True to avoid huge weight that tflite dont like
   """Defines the default MobilenetV2 arg scope.
 
   Args:

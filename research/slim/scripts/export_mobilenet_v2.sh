@@ -93,7 +93,7 @@ echo "Exporting graph architecture to ${MODEL_FOLDER}/unfrozen_graph.pb"
 echo "*******"
 python export_inference_graph.py \
   --model_name=${SLIM_NAME} --dataset_name=landmark_300W_LP --image_size=${IMAGE_SIZE} --logtostderr \
-  --output_file=${MODEL_FOLDER}/unfrozen_graph.pb --dataset_dir=${MODEL_FOLDER} #--is_training=True
+  --output_file=${MODEL_FOLDER}/unfrozen_graph.pb --dataset_dir=${MODEL_FOLDER} --quantize=True #--is_training=True
 
 cd ${TENSORFLOW_PATH}
 

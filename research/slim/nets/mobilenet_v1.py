@@ -305,6 +305,7 @@ def mobilenet_v1_base(inputs,
 
 def mobilenet_v1(inputs,
                  num_classes=1000,
+                 use_dropout=True,
                  dropout_keep_prob=0.999,
                  is_training=True,
                  min_depth=8,
@@ -322,6 +323,7 @@ def mobilenet_v1(inputs,
     num_classes: number of predicted classes. If 0 or None, the logits layer
       is omitted and the input features to the logits layer (before dropout)
       are returned instead.
+    use_dropout: Whether to use dropout layers.
     dropout_keep_prob: the percentage of activation values that are retained.
     is_training: whether is training or not.
     min_depth: Minimum depth value (number of channels) for all convolution ops.
@@ -379,11 +381,13 @@ def mobilenet_v1(inputs,
         if not num_classes:
           return net, end_points
         # 1 x 1 x 1024
-        net = slim.dropout(net, keep_prob=dropout_keep_prob, scope='Dropout_1b')
+        if use_dropout: 
+          net = slim.dropout(net, keep_prob=dropout_keep_prob, scope='Dropout_1b')
         logits = slim.conv2d(net, num_classes, [1, 1], activation_fn=None,
                              normalizer_fn=None, scope='Conv2d_1c_1x1')
         if spatial_squeeze:
-          logits = tf.squeeze(logits, [1, 2], name='SpatialSqueeze')
+          logits = tf.squeeze(logits, [1, 2], name='SpatialSqueeze') #tflite do not like squeeze??
+          #logits = tf.reshape(logits, [-1, num_classes], name='Reshape')
       end_points['Logits'] = logits
       if prediction_fn:
         end_points['Predictions'] = prediction_fn(logits, scope='Predictions')

@@ -31,6 +31,7 @@ datasets_map = {
     'imagenet': imagenet,
     'mnist': mnist,
     'landmark_300W_LP': landmark_300W_LP,
+    'landmark_3d_300W_LP': landmark_3d_300W_LP,
     'landmark_300VW': landmark_300VW,
 }
 

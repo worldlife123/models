@@ -232,7 +232,10 @@ tf.app.flags.DEFINE_integer('quantize_delay', 0,
 ####################
 # GPU Config Flags #
 ####################
-tf.app.flags.DEFINE_float('gpu_memory_fraction', 0.5,
+tf.app.flags.DEFINE_float('gpu_memory_fraction', 1.0,
+                            'GPU memory to take for training session. 1.0 stand for full use.')
+
+tf.app.flags.DEFINE_boolean('allow_growth', True,
                             'GPU memory to take for training session. 1.0 stand for full use.')
 
 FLAGS = tf.app.flags.FLAGS
@@ -588,7 +591,7 @@ def main(_):
         is_chief=(FLAGS.task == 0),
         init_fn=_get_init_fn(),
         summary_op=summary_op,
-        session_config=tf.ConfigProto(gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=FLAGS.gpu_memory_fraction)),
+        session_config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=FLAGS.allow_growth, per_process_gpu_memory_fraction=FLAGS.gpu_memory_fraction)),
         number_of_steps=FLAGS.max_number_of_steps,
         log_every_n_steps=FLAGS.log_every_n_steps,
         save_summaries_secs=FLAGS.save_summaries_secs,

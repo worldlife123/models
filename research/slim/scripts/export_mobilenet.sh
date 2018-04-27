@@ -62,7 +62,7 @@ if [[ ${IMAGE_SIZE} -ne "224" ]] && [[ ${IMAGE_SIZE} -ne "192" ]] && [[ ${IMAGE_
 fi
 
 if [[ ${TENSORFLOW_PATH} -eq "" ]]; then
-   TENSORFLOW_PATH=../tensorflow
+   TENSORFLOW_PATH=~/tensorflow
 fi
 
 if [[ ! -d ${TENSORFLOW_PATH} ]]; then
@@ -73,14 +73,13 @@ if [[ ! -d ${TENSORFLOW_PATH} ]]; then
    exit 1
 fi
 
-MODEL_FOLDER=/tmp/mobilenet_v1_${MOBILENET_VERSION}_${IMAGE_SIZE}
+MODEL_FOLDER=/tmp/mobilenet_v1_${MOBILENET_VERSION}_${IMAGE_SIZE}_quantize
 if [[ -d ${MODEL_FOLDER} ]]; then
-  echo "Model folder ${MODEL_FOLDER} already exists!"
-  echo "If you want to overwrite it, then 'rm -rf ${MODEL_FOLDER}' first."
-  print_usage
-  exit 1
+  echo "Model folder ${MODEL_FOLDER} already exists! Emptying ${MODEL_FOLDER} ..."
+  rm -rf ${MODEL_FOLDER}/*
+else
+  mkdir ${MODEL_FOLDER}
 fi
-mkdir ${MODEL_FOLDER}
 
 if [[ ${CHECKPOINT} = "" ]]; then
   echo "*******"
@@ -95,11 +94,13 @@ fi
 echo "*******"
 echo "Exporting graph architecture to ${MODEL_FOLDER}/unfrozen_graph.pb"
 echo "*******"
-bazel run slim:export_inference_graph -- \
+python export_inference_graph.py \
   --model_name=${SLIM_NAME} --image_size=${IMAGE_SIZE} --logtostderr \
   --output_file=${MODEL_FOLDER}/unfrozen_graph.pb --dataset_dir=${MODEL_FOLDER}
 
-cd ../tensorflow
+cd ${TENSORFLOW_PATH}
+
+OUTPUT_NODE_NAMES=MobilenetV1/Predictions/Reshape_1
 
 echo "*******"
 echo "Freezing graph to ${MODEL_FOLDER}/frozen_graph.pb"
@@ -108,13 +109,13 @@ bazel run tensorflow/python/tools:freeze_graph -- \
   --input_graph=${MODEL_FOLDER}/unfrozen_graph.pb \
   --input_checkpoint=${CHECKPOINT} \
   --input_binary=true --output_graph=${MODEL_FOLDER}/frozen_graph.pb \
-  --output_node_names=MobilenetV1/Predictions/Reshape_1
+  --output_node_names=${OUTPUT_NODE_NAMES}
 
 echo "Quantizing weights to ${MODEL_FOLDER}/quantized_graph.pb"
 bazel run tensorflow/tools/graph_transforms:transform_graph -- \
   --in_graph=${MODEL_FOLDER}/frozen_graph.pb \
   --out_graph=${MODEL_FOLDER}/quantized_graph.pb \
-  --inputs=input --outputs=MobilenetV1/Predictions/Reshape_1 \
+  --inputs=input --outputs=${OUTPUT_NODE_NAMES} \
   --transforms='fold_constants fold_batch_norms quantize_weights'
 
 echo "*******"
@@ -122,7 +123,7 @@ echo "Running label_image using the graph"
 echo "*******"
 bazel build tensorflow/examples/label_image:label_image
 bazel-bin/tensorflow/examples/label_image/label_image \
-  --input_layer=input --output_layer=MobilenetV1/Predictions/Reshape_1 \
+  --input_layer=input --output_layer=${OUTPUT_NODE_NAMES} \
   --graph=${MODEL_FOLDER}/quantized_graph.pb --input_mean=-127 --input_std=127 \
   --image=tensorflow/examples/label_image/data/grace_hopper.jpg \
   --input_width=${IMAGE_SIZE} --input_height=${IMAGE_SIZE} --labels=${MODEL_FOLDER}/labels.txt
@@ -130,3 +131,26 @@ bazel-bin/tensorflow/examples/label_image/label_image \
 echo "*******"
 echo "Saved graphs to ${MODEL_FOLDER}/frozen_graph.pb and ${MODEL_FOLDER}/quantized_graph.pb"
 echo "*******"
+
+echo "Exporting tflite model to ${MODEL_FOLDER}/lite_model.tflite"
+bazel run tensorflow/contrib/lite/toco:toco -- \
+  --input_file=${MODEL_FOLDER}/frozen_graph.pb \
+  --input_format=TENSORFLOW_GRAPHDEF \
+  --output_format=TFLITE \
+  --output_file=${MODEL_FOLDER}/lite_model.tflite \
+  --inference_type=FLOAT \
+  --inference_input_type=FLOAT --input_arrays=input \
+  --output_arrays=${OUTPUT_NODE_NAMES} \
+  --input_shapes=1,${IMAGE_SIZE},${IMAGE_SIZE},3
+  
+#TODO: do not work!
+echo "Exporting quantized tflite model to ${MODEL_FOLDER}/lite_model_quantized.tflite"
+bazel run tensorflow/contrib/lite/toco:toco -- \
+  --input_file=${MODEL_FOLDER}/quantized_graph.pb \
+  --input_format=TENSORFLOW_GRAPHDEF \
+  --output_format=TFLITE \
+  --output_file=${MODEL_FOLDER}/lite_model_quantized.tflite \
+  --inference_type=QUANTIZED_UINT8 \
+  --inference_input_type=QUANTIZED_UINT8 --input_arrays=input \
+  --output_arrays=${OUTPUT_NODE_NAMES} \
+  --input_shapes=1,${IMAGE_SIZE},${IMAGE_SIZE},3

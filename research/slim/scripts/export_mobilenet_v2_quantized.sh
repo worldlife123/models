@@ -76,9 +76,10 @@ fi
 MODEL_FOLDER=/tmp/mobilenet_v2_${MOBILENET_VERSION}_${IMAGE_SIZE}_quantize
 if [[ -d ${MODEL_FOLDER} ]]; then
   echo "Model folder ${MODEL_FOLDER} already exists! Removing ${MODEL_FOLDER} ..."
-  rm -rf ${MODEL_FOLDER}
+  rm -rf ${MODEL_FOLDER}/*
+else
+  mkdir ${MODEL_FOLDER}
 fi
-mkdir ${MODEL_FOLDER}
 
 if [[ ${CHECKPOINT} = "" ]]; then
   echo "*******"
@@ -100,7 +101,7 @@ bazel run tensorflow/python/tools:import_pb_to_tensorboard -- \
   --log_dir=${MODEL_FOLDER} \
   --model_dir=${MODEL_FOLDER}/unfrozen_graph.pb
 
-OUTPUT_NODE_NAMES=MobilenetV2/Logits/Reshape #MobilenetV2/Predictions/Reshape_1
+OUTPUT_NODE_NAMES=MobilenetV2/Logits/SpatialSqueeze #MobilenetV2/Predictions/Reshape_1
 
 echo "*******"
 echo "Freezing graph to ${MODEL_FOLDER}/frozen_graph.pb"
@@ -110,6 +111,10 @@ bazel run tensorflow/python/tools:freeze_graph -- \
   --input_checkpoint=${CHECKPOINT} \
   --input_binary=true --output_graph=${MODEL_FOLDER}/frozen_graph.pb \
   --output_node_names=${OUTPUT_NODE_NAMES}
+  
+bazel run tensorflow/python/tools:import_pb_to_tensorboard -- \
+  --log_dir=${MODEL_FOLDER} \
+  --model_dir=${MODEL_FOLDER}/frozen_graph.pb
 
 echo "*******"
 echo "Exporting quantized tflite model to ${MODEL_FOLDER}/lite_model_quantized.tflite"
@@ -119,7 +124,12 @@ bazel run tensorflow/contrib/lite/toco:toco -- \
   --input_format=TENSORFLOW_GRAPHDEF \
   --output_format=TFLITE \
   --output_file=${MODEL_FOLDER}/lite_model_quantized.tflite \
+  --dump_graphviz=${MODEL_FOLDER} \
   --inference_type=QUANTIZED_UINT8 \
-  --inference_input_type=QUANTIZED_UINT8 --input_arrays=input \
+  --input_arrays=input \
   --output_arrays=${OUTPUT_NODE_NAMES} \
-  --input_shapes=1,224,224,3
+  --input_shapes=1,224,224,3 \
+  --std_values=127.5 --mean_values=127.5 \
+#  --default_ranges_min=-70 \
+#  --default_ranges_max=70 \
+

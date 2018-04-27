@@ -2,7 +2,7 @@
 PRETRAINED_CHECKPOINT_DIR=checkpoints/mobilenetv2_sgd
 
 # Where the training (fine-tuned) checkpoint and logs will be saved to.
-TRAIN_DIR=/tmp/mobilenet_v2_training_quantize/
+TRAIN_DIR=/tmp/mobilenet_v2_training_quantize_5/
 #rm -rf ${TRAIN_DIR}
 
 # Where the dataset is saved to.
@@ -16,7 +16,7 @@ python train_landmark_regressor.py \
   --dataset_dir=${DATASET_DIR} \
   --model_name=mobilenet_v2 \
   --preprocessing_name face_landmark \
-  --max_number_of_steps=150000 \
+  --max_number_of_steps=200000 \
   --batch_size=16 \
   --learning_rate=0.00001 \
   --learning_rate_decay_type=fixed \

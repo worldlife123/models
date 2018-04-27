@@ -79,20 +79,20 @@ class ImageDrawer(object):
     self._image_data = tf.placeholder(dtype=tf.float32, shape=[None, None, 3])
     self._bbox_data = tf.placeholder(dtype=tf.float32, shape=[4])
     self._lm_data = tf.placeholder(dtype=tf.float32, shape=[136])
-    self._draw_bbox = tf.summary.image('image_with_bounding_boxes', 
+    self._draw_bbox = lambda name : tf.summary.image(name, 
                                        tf.image.draw_bounding_boxes(tf.expand_dims(self._image_data, 0),
                                                                     tf.expand_dims(tf.expand_dims(self._bbox_data, 0), 0)))
     landmarks_2d = tf.transpose(tf.reshape(self._lm_data,[-1,2]))
     pt2bboxes = tf.stack([landmarks_2d[0]-0.01, landmarks_2d[1]-0.01, landmarks_2d[0]+0.01, landmarks_2d[1]+0.01], axis=1)
-    self._draw_lm = tf.summary.image('image_with_landmarks', 
+    self._draw_lm = lambda name : tf.summary.image(name, 
                                      tf.image.draw_bounding_boxes(tf.expand_dims(self._image_data, 0), tf.expand_dims(pt2bboxes,0)))
 
-  def draw_bbox(self, sess, image_data, bbox):
+  def draw_bbox(self, sess, image_data, bbox, name="image_with_bounding_box"):
     image = sess.run(self._draw_bbox,
                              feed_dict={self._image_data: image_data, self._bbox_data: bbox})
     return image
 
-  def draw_lm(self, sess, image_data, lm):
+  def draw_lm(self, sess, image_data, lm, name="image_with_landmarks"):
     image = sess.run(self._draw_lm,
                      feed_dict={self._image_data: image_data, self._lm_data: lm})
     #assert len(image.shape) == 3
@@ -123,8 +123,8 @@ def _get_filenames(dataset_dir, split_name):
     full_directory = os.path.join(dataset_dir,directory)
     for filename in os.listdir(full_directory):
       if filename[-4:]==".jpg":
-        photo_path = os.path.join(full_directory, filename)
-        photo_filenames.append(photo_path)
+        photo_path_woext = os.path.join(full_directory, filename[:-4])
+        photo_filenames.append(photo_path_woext)
         label_filenames.append(os.path.join(dataset_dir, "landmarks", directory, filename[:-4] + "_pts.mat"))
 
   return photo_filenames, label_filenames
@@ -135,6 +135,23 @@ def _get_dataset_filename(dataset_dir, split_name, shard_id):
       split_name, shard_id, _NUM_SHARDS)
   return os.path.join(dataset_dir, output_filename)
 
+def _convert_tfexample(image_data, image_format, height, width, facebbox, landmarks_2d, landmarks_3d, params):
+  return tf.train.Example(features=tf.train.Features(feature={
+      'image/encoded': dataset_utils.bytes_feature(image_data),
+      'image/format': dataset_utils.bytes_feature(image_format),
+      'image/face/bbox': dataset_utils.float_feature(facebbox),
+      'image/face/landmark_2d': dataset_utils.float_feature(landmarks_2d),
+      'image/face/landmark_3d': dataset_utils.float_feature(landmarks_3d),
+      'image/height': dataset_utils.int64_feature(height),
+      'image/width': dataset_utils.int64_feature(width),
+      'image/face/params/roi': dataset_utils.int64_feature(list(params['roi'].ravel())),
+      'image/face/params/pose': dataset_utils.float_feature(list(params['Pose_Para'].ravel())),
+      'image/face/params/color': dataset_utils.float_feature(list(params['Color_Para'].ravel())),
+      'image/face/params/shape': dataset_utils.float_feature(list(params['Shape_Para'].ravel())),
+      'image/face/params/texture': dataset_utils.float_feature(list(params['Tex_Para'].ravel())),
+      'image/face/params/expression': dataset_utils.float_feature(list(params['Exp_Para'].ravel())),
+      'image/face/params/illumination': dataset_utils.float_feature(list(params['Illum_Para'].ravel())),
+  }))
 
 def _convert_dataset(split_name, photo_filenames, label_filenames, dataset_dir, summary_writer=None):
   """Converts the given filenames to a TFRecord dataset.
@@ -154,7 +171,7 @@ def _convert_dataset(split_name, photo_filenames, label_filenames, dataset_dir, 
     image_reader = ImageReader()
     image_drawer = ImageDrawer()
 
-    with tf.Session('') as sess:
+    with tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))) as sess:
 
       for shard_id in range(_NUM_SHARDS):
         output_filename = _get_dataset_filename(
@@ -169,32 +186,39 @@ def _convert_dataset(split_name, photo_filenames, label_filenames, dataset_dir, 
             sys.stdout.flush()
 
             # Read the filename:
-            image_data = tf.gfile.FastGFile(photo_filenames[i], 'rb').read()
+            image_data = tf.gfile.FastGFile(photo_filenames[i]+".jpg", 'rb').read()
             height, width = image_reader.read_image_dims(sess, image_data)
             
+            params = sio.loadmat(photo_filenames[i]+".mat")
             
             mat = sio.loadmat(label_filenames[i])
             pt2d = mat['pts_2d'].T
+            pt3d = mat['pts_3d'].T
             #convert to [0,1] and (y,x) for convenience
             new_pt2d = pt2d.copy()
             new_pt2d[0,:] = pt2d[1,:]/height
             new_pt2d[1,:] = pt2d[0,:]/width
+            new_pt3d = pt3d.copy()
+            new_pt3d[0,:] = pt3d[1,:]/height
+            new_pt3d[1,:] = pt3d[0,:]/width
             x_min = min(new_pt2d[1,:])
             y_min = min(new_pt2d[0,:])
             x_max = max(new_pt2d[1,:])
             y_max = max(new_pt2d[0,:])
             
-            bbox, landmarks = [y_min, x_min, y_max, x_max], list(new_pt2d.T.ravel())
+            bbox, landmarks_2d, landmarks_3d = [y_min, x_min, y_max, x_max], list(new_pt2d.T.ravel()), list(new_pt3d.T.ravel())
             
             if summary_writer:
               image = image_reader.decode_jpeg(sess, image_data)
               image_with_box = image_drawer.draw_bbox(sess, image, bbox)
-              image_with_lm = image_drawer.draw_lm(sess, image, landmarks)
+              image_with_lm = image_drawer.draw_lm(sess, image, landmarks_2d)
+              image_with_lm_3d = image_drawer.draw_lm(sess, image, landmarks_3d, "image_with_landmarks_3d")
               summary_writer.add_summary(image_with_box)
               summary_writer.add_summary(image_with_lm)
+              summary_writer.add_summary(image_with_lm_3d)
 
-            example = dataset_utils.image_to_tfexample_face_landmark(
-                image_data, b'jpg', height, width, bbox, landmarks)
+            example = _convert_tfexample(
+                image_data, b'jpg', height, width, bbox, landmarks_2d, landmarks_3d, params)
             tfrecord_writer.write(example.SerializeToString())
 
   sys.stdout.write('\n')

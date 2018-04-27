@@ -174,7 +174,7 @@ def distorted_bounding_box_crop(image,
     cropped_image = tf.slice(image, bbox_begin, bbox_size)
     return cropped_image, distort_bbox
 
-def expand_bounding_box_crop_resize(image, height, width, bbox, expand_range=(1.2, 2.0), scope=None):
+def expand_bounding_box_crop_resize(image, height, width, bbox, expand_range=(1.0, 2.0), scope=None):
     with tf.name_scope(scope, 'expand_bounding_box_crop_resize', [image, height, width, bbox]):
         #expand bbox randomly
         bbox_size = tf.gather(bbox, [2,3]) - tf.gather(bbox, [0,1])
@@ -191,8 +191,62 @@ def expand_bounding_box_crop_resize(image, height, width, bbox, expand_range=(1.
                                                 extrapolation_value=0)[-1] #remove batch
         return cropped_image, expand_bbox
 
+def rnd_transform_crop(image, height, width, bbox, landmarks,
+                       scale_range=(1.4, 2.0), 
+                       rotation_range=(-35., 35.), 
+                       scope=None):
+	def _get_rot_mat(rot):
+	    ang = rot# * 3.1416 / 180
+	    s = tf.sin(ang)
+	    c = tf.cos(ang)
+#	    r = tf.eye(3)
+#	    r[0][0] = c
+#	    r[0][1] = -s
+#	    r[1][0] = s
+#	    r[1][1] = c
+	    r = tf.reshape(tf.stack([c,-s,0,s,c,0,0,0,1]),[3,3])
+	    # rotation is around center
+	    t_ = tf.constant([[1,0,-0.5],[0,1,-0.5],[0,0,1]])
+	    t_inv = tf.constant([[1,0,0.5],[0,1,0.5],[0,0,1]])
+	    r = tf.matmul(tf.matmul(t_inv, r), t_)
+
+	    return r
+	
+	with tf.name_scope(scope, 'rnd_transform_crope', [image, height, width, bbox, landmarks]):
+		#expand bbox randomly
+		bbox_size = tf.gather(bbox, [2,3]) - tf.gather(bbox, [0,1])
+		bbox_center = (tf.gather(bbox, [2,3]) + tf.gather(bbox, [0,1]))/2
+		crop_size = tf.maximum(bbox_size[0], bbox_size[1])
+		rd_expand = tf.reshape(tf.stack([tf.random_uniform([1], minval=-bbox_size[0]/2*scale_range[1], maxval=-bbox_size[0]/2*scale_range[0]),
+                                         tf.random_uniform([1], minval=-bbox_size[1]/2*scale_range[1], maxval=-bbox_size[1]/2*scale_range[0]),
+                                         tf.random_uniform([1], minval=bbox_size[0]/2*scale_range[0], maxval=bbox_size[0]/2*scale_range[1]),
+                                         tf.random_uniform([1], minval=bbox_size[1]/2*scale_range[0], maxval=bbox_size[1]/2*scale_range[1])]), [-1])
+		expand_bbox = tf.reshape(tf.stack([bbox_center, bbox_center]), [-1]) + rd_expand
+		cropped_image = tf.image.crop_and_resize(tf.expand_dims(image, 0),
+		                                         tf.expand_dims(expand_bbox, 0),
+		                                         [0],
+		                                         tf.constant([height,width], dtype=tf.int32),
+		                                         extrapolation_value=0)[-1] #remove batch
+		#tf.summary.image('image_before_rotate', tf.expand_dims(cropped_image,0))
+		rot_angles = tf.random_uniform([1], minval=rotation_range[0]*3.1416/180, maxval=rotation_range[1]*3.1416/180)
+		rotated_image = tf.contrib.image.rotate(tf.expand_dims(cropped_image, 0), 
+		                                        rot_angles,
+		                                        interpolation='BILINEAR')[-1] #remove batch
+		#tf.summary.image('image_after_rotate', tf.expand_dims(rotated_image,0))
+		rotated_image = tf.image.resize_image_with_crop_or_pad(rotated_image, height, width) 
+		#rotated_image = tf.image.resize_images(tf.expand_dims(rotated_image,0), [height, width])[-1]
+		#tf.summary.image('image_after_rotate_resize', tf.expand_dims(rotated_image,0))
+		lm_num = tf.div(tf.shape(landmarks),tf.constant(2))
+		bb_begin = tf.tile(tf.gather(expand_bbox, [0,1]), lm_num)
+		bb_size = tf.tile(tf.abs(tf.gather(expand_bbox, [2,3]) - tf.gather(expand_bbox, [0,1])), lm_num)
+		distorted_landmarks = (landmarks - bb_begin) / bb_size
+		rot_mat = _get_rot_mat(rot_angles[-1])
+		new_landmarks = tf.matmul(rot_mat, tf.stack([distorted_landmarks[0:136:2], distorted_landmarks[1:137:2], tf.fill([68], 1.)]))
+		new_landmarks = tf.reshape(tf.transpose(new_landmarks)[:,0:2], [-1])
+		
+		return rotated_image, expand_bbox, new_landmarks
+
 def preprocess_for_train(image, height, width, bbox, landmarks,
-                         expand_range=(1.2, 2.0),
                          fast_mode=True,
                          scope=None,
                          add_image_summaries=True):
@@ -238,10 +292,12 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
       tf.summary.image('image_with_bounding_boxes', image_with_box)
 
     bbox.set_shape([4])
+    landmarks.set_shape([136]) #TODO: allow non-68 landmarks
 
-    distorted_image, distorted_bbox = expand_bounding_box_crop_resize(image, height, width, bbox,
-                                                                      expand_range=expand_range)
+    #distorted_image, distorted_bbox = expand_bounding_box_crop_resize(image, height, width, bbox,
+    #                                                                  expand_range=expand_range)
     #distorted_bounding_box_crop(image, bbox, min_object_covered=min_object_covered)
+    distorted_image, distorted_bbox, distorted_landmarks = rnd_transform_crop(image, height, width, bbox, landmarks)
     
     # Restore the shape since the dynamic slice based upon the bbox_size loses
     # the third dimension.
@@ -252,26 +308,13 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
       tf.summary.image('images_with_distorted_bounding_box',
                        image_with_distorted_box)
 
-    # This resizing operation may distort the images because the aspect
-    # ratio is not respected. We select a resize method in a round robin
-    # fashion based on the thread number.
-    # Note that ResizeMethod contains 4 enumerated resizing methods.
-
-    # We select only 1 case for fast_mode bilinear.
-    '''num_resize_cases = 1 if fast_mode else 4
-    distorted_image = apply_with_random_selector(
-        distorted_image,
-        lambda x, method: tf.image.resize_images(x, [height, width], method),
-        num_cases=num_resize_cases)'''
-    landmarks.set_shape([136]) #TODO: allow non-68 landmarks
-    
-    #convert landmarks to [0,1]
+    '''#convert landmarks to [0,1]
     #distorted_bbox = tf.reshape(distorted_bbox, [-1])
     #distorted_landmarks = tf.reshape(landmarks,[2,-1])
     bb_begin = tf.tile(tf.gather(distorted_bbox, [0,1]), tf.div(tf.shape(landmarks),tf.constant(2)))
     bb_size = tf.tile(tf.abs(tf.gather(distorted_bbox, [2,3]) - tf.gather(distorted_bbox, [0,1])), tf.div(tf.shape(landmarks),tf.constant(2)))
     distorted_landmarks = (landmarks - bb_begin) / bb_size
-    #distorted_landmarks = tf.reshape(distorted_landmarks,[-1])
+    #distorted_landmarks = tf.reshape(distorted_landmarks,[-1])'''
 
 
     if add_image_summaries:
@@ -297,10 +340,11 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
       distorted_image_with_lm = draw_landmarks(distorted_image, distorted_landmarks)
       tf.summary.image('final_distorted_image_with_landmarks',distorted_image_with_lm)
     
-    #distorted_image = tf.subtract(distorted_image, 0.5)
-    #distorted_image = tf.multiply(distorted_image, 2.0)
-    
-    #change range to [0.0, 255.0] for quantization
+    #change range to [-1,1]
+    distorted_image = tf.subtract(distorted_image, 0.5)
+    distorted_image = tf.multiply(distorted_image, 2.0)
+    distorted_landmarks = tf.subtract(distorted_landmarks, 0.5)
+    distorted_landmarks = tf.multiply(distorted_landmarks, 2.0)
     #distorted_image = tf.multiply(distorted_image, 255.0)
     #distorted_landmarks = tf.multiply(distorted_landmarks, 255.0)
     return distorted_image, distorted_landmarks
@@ -362,6 +406,12 @@ def preprocess_for_eval(image, height, width, bbox, landmarks,
     bb_size = tf.tile(tf.abs(tf.gather(distorted_bbox, [2,3]) - tf.gather(distorted_bbox, [0,1])), tf.div(tf.shape(landmarks),tf.constant(2)))
     distorted_landmarks = (landmarks - bb_begin) / bb_size
     #distorted_landmarks = tf.reshape(distorted_landmarks,[-1])
+    
+    #change range to [-1,1]
+    distorted_image = tf.subtract(distorted_image, 0.5)
+    distorted_image = tf.multiply(distorted_image, 2.0)
+    distorted_landmarks = tf.subtract(distorted_landmarks, 0.5)
+    distorted_landmarks = tf.multiply(distorted_landmarks, 2.0)
 
     return distorted_image, distorted_landmarks
 
