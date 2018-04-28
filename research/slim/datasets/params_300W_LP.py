@@ -78,6 +78,8 @@ def get_split(split_name, dataset_dir, file_pattern=None, reader=None):
       'image/face/landmark_3d': tf.VarLenFeature(dtype=tf.float32), #tf.FixedLenFeature(
           #[], tf.float32, default_value=tf.zeros([136], dtype=tf.float32)),
       'image/face/params/pose': tf.VarLenFeature(dtype=tf.float32),
+      'image/face/params/shape': tf.VarLenFeature(dtype=tf.float32),
+      'image/face/params/expression': tf.VarLenFeature(dtype=tf.float32),
   }
 
   items_to_handlers = {
@@ -86,6 +88,9 @@ def get_split(split_name, dataset_dir, file_pattern=None, reader=None):
       'landmark_2d': slim.tfexample_decoder.Tensor('image/face/landmark_2d', shape=[136]),
       'landmark_3d': slim.tfexample_decoder.Tensor('image/face/landmark_3d', shape=[136]),
       'pose': slim.tfexample_decoder.Tensor('image/face/params/pose', shape=[7]),
+      'shape': slim.tfexample_decoder.Tensor('image/face/params/shape', shape=[199]),
+      'expression': slim.tfexample_decoder.Tensor('image/face/params/expression', shape=[29]),
+      #'label': ['shape', 'expression', 'pose']
   }
 
   decoder = slim.tfexample_decoder.TFExampleDecoder(

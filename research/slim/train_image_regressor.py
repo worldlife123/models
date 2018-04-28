@@ -24,6 +24,7 @@ from datasets import dataset_factory
 from deployment import model_deploy
 from nets import nets_factory
 from preprocessing import preprocessing_factory
+from postprocessing import postprocessing_factory
 
 slim = tf.contrib.slim
 
@@ -184,6 +185,10 @@ tf.app.flags.DEFINE_string(
 
 tf.app.flags.DEFINE_string(
     'preprocessing_name', None, 'The name of the preprocessing to use. If left '
+    'as `None`, then the model_name flag is used.')
+
+tf.app.flags.DEFINE_string(
+    'postprocessing_name', None, 'The name of the postprocessing to use. If left '
     'as `None`, then the model_name flag is used.')
 
 tf.app.flags.DEFINE_integer(
@@ -441,6 +446,9 @@ def main(_):
     image_preprocessing_fn = preprocessing_factory.get_preprocessing(
         preprocessing_name,
         is_training=True)
+        
+    postprocessing_name = FLAGS.postprocessing_name or FLAGS.model_name
+    output_postprocessing_fn = postprocessing_factory.get_postprocessing(postprocessing_name)
 
     ##############################################################
     # Create a dataset provider that loads data from the dataset #
@@ -451,15 +459,15 @@ def main(_):
           num_readers=FLAGS.num_readers,
           common_queue_capacity=20 * FLAGS.batch_size,
           common_queue_min=10 * FLAGS.batch_size)
-      [image, bbox, landmarks] = provider.get(['image', 'bbox', 'landmarks'])
+      [image, bbox, label] = provider.get(['image', 'bbox', 'label'])
       #label -= FLAGS.labels_offset
       #with tf.Session():
         #bbox.eval()
-        #print(landmarks.eval())
+        #print(landmark_2d.eval())
 
       train_image_size = FLAGS.train_image_size or network_fn.default_image_size
 
-      image, label = image_preprocessing_fn(image, train_image_size, train_image_size, bbox=bbox, landmarks=landmarks)
+      image, label = image_preprocessing_fn(image, train_image_size, train_image_size, bbox=bbox, label=label)
 
       images, labels = tf.train.batch(
           [image, label],
@@ -491,8 +499,11 @@ def main(_):
             label_smoothing=FLAGS.label_smoothing, weights=0.4,
             scope='aux_loss')
             
+      logits_pp = output_postprocessing_fn(logits)
+      labels_pp = output_postprocessing_fn(labels)
+      
       tf.losses.absolute_difference(
-          logits, labels, weights=1.0)
+          logits_pp, labels_pp, weights=1.0) #TODO: use FLAGS to select losses
       
       return end_points
 

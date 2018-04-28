@@ -8,7 +8,7 @@ TRAIN_DIR=/tmp/mobilenet_v1_training_quantize/ft_quantize
 DATASET_DIR=/home/dff/NewDisk/300VW
 
 # Fine-tune only the new layers for 2000 steps.
-python train_landmark_regressor.py \
+python train_image_regressor.py \
   --train_dir=${TRAIN_DIR} \
   --dataset_name=landmark_300VW \
   --dataset_split_name=train \

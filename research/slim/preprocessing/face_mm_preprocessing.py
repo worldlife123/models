@@ -110,70 +110,6 @@ def distort_color(image, color_ordering=0, fast_mode=True, scope=None):
     return tf.clip_by_value(image, 0.0, 1.0)
 
 
-def distorted_bounding_box_crop(image,
-                                bbox,
-                                min_object_covered=0.1,
-                                aspect_ratio_range=(0.75, 1.33),
-                                area_range=(0.05, 1.0),
-                                max_attempts=100,
-                                scope=None):
-  """Generates cropped_image using a one of the bboxes randomly distorted.
-
-  See `tf.image.sample_distorted_bounding_box` for more documentation.
-
-  Args:
-    image: 3-D Tensor of image (it will be converted to floats in [0, 1]).
-    bbox: 3-D float Tensor of bounding boxes arranged [1, num_boxes, coords]
-      where each coordinate is [0, 1) and the coordinates are arranged
-      as [ymin, xmin, ymax, xmax]. If num_boxes is 0 then it would use the whole
-      image.
-    min_object_covered: An optional `float`. Defaults to `0.1`. The cropped
-      area of the image must contain at least this fraction of any bounding box
-      supplied.
-    aspect_ratio_range: An optional list of `floats`. The cropped area of the
-      image must have an aspect ratio = width / height within this range.
-    area_range: An optional list of `floats`. The cropped area of the image
-      must contain a fraction of the supplied image within in this range.
-    max_attempts: An optional `int`. Number of attempts at generating a cropped
-      region of the image of the specified constraints. After `max_attempts`
-      failures, return the entire image.
-    scope: Optional scope for name_scope.
-  Returns:
-    A tuple, a 3-D Tensor cropped_image and the distorted bbox
-  """
-  with tf.name_scope(scope, 'distorted_bounding_box_crop', [image, bbox]):
-    # Each bounding box has shape [1, num_boxes, box coords] and
-    # the coordinates are ordered [ymin, xmin, ymax, xmax].
-
-    # A large fraction of image datasets contain a human-annotated bounding
-    # box delineating the region of the image containing the object of interest.
-    # We choose to create a new bounding box for the object which is a randomly
-    # distorted version of the human-annotated bounding box that obeys an
-    # allowed range of aspect ratios, sizes and overlap with the human-annotated
-    # bounding box. If no box is supplied, then we assume the bounding box is
-    # the entire image.
-#    bbox_x = bbox[3]-bbox[1]
-#    bbox_y = bbox[2]-bbox[0]
-#    expand_ratio = 2.0
-#    bbox_begin_expand = tf.constant(expand_ratio/4)
-#    bbox_size_expand = tf.constant(expand_ratio/2)
-    sample_distorted_bounding_box = tf.image.sample_distorted_bounding_box(
-        tf.shape(image),
-        bounding_boxes=tf.expand_dims(tf.expand_dims(bbox,0),0),
-        min_object_covered=min_object_covered,
-        aspect_ratio_range=aspect_ratio_range,
-        area_range=area_range,
-        max_attempts=max_attempts,
-        use_image_if_no_bounding_boxes=True)
-    bbox_begin, bbox_size, distort_bbox = sample_distorted_bounding_box
-
-#    bbox_begin = tf.gather(bbox, [0,1]) + tf.stack([tf.random_uniform([1], minval=-bbox_begin_expand*bbox_y, maxval=0), tf.random_uniform([1], minval=-bbox_begin_expand*bbox_x, maxval=0)])
-#    bbox_size = tf.stack([bbox_y+tf.random_uniform([1], minval=0, maxval=bbox_size_expand*bbox_y), bbox_x+tf.random_uniform([1], minval=0, maxval=bbox_size_expand*bbox_x)])
-
-    # Crop the image to the specified bounding box.
-    cropped_image = tf.slice(image, bbox_begin, bbox_size)
-    return cropped_image, distort_bbox
-
 def expand_bounding_box_crop_resize(image, height, width, bbox, expand_range=(1.0, 2.0), scope=None):
     with tf.name_scope(scope, 'expand_bounding_box_crop_resize', [image, height, width, bbox]):
         #expand bbox randomly
@@ -191,62 +127,7 @@ def expand_bounding_box_crop_resize(image, height, width, bbox, expand_range=(1.
                                                 extrapolation_value=0)[-1] #remove batch
         return cropped_image, expand_bbox
 
-def rnd_transform_crop(image, height, width, bbox, landmarks,
-                       scale_range=(1.4, 2.0), 
-                       rotation_range=(-35., 35.), 
-                       scope=None):
-	def _get_rot_mat(rot):
-	    ang = rot# * 3.1416 / 180
-	    s = tf.sin(ang)
-	    c = tf.cos(ang)
-#	    r = tf.eye(3)
-#	    r[0][0] = c
-#	    r[0][1] = -s
-#	    r[1][0] = s
-#	    r[1][1] = c
-	    r = tf.reshape(tf.stack([c,-s,0,s,c,0,0,0,1]),[3,3])
-	    # rotation is around center
-	    t_ = tf.constant([[1,0,-0.5],[0,1,-0.5],[0,0,1]])
-	    t_inv = tf.constant([[1,0,0.5],[0,1,0.5],[0,0,1]])
-	    r = tf.matmul(tf.matmul(t_inv, r), t_)
-
-	    return r
-	
-	with tf.name_scope(scope, 'rnd_transform_crope', [image, height, width, bbox, landmarks]):
-		#expand bbox randomly
-		bbox_size = tf.gather(bbox, [2,3]) - tf.gather(bbox, [0,1])
-		bbox_center = (tf.gather(bbox, [2,3]) + tf.gather(bbox, [0,1]))/2
-		crop_size = tf.maximum(bbox_size[0], bbox_size[1])
-		rd_expand = tf.reshape(tf.stack([tf.random_uniform([1], minval=-bbox_size[0]/2*scale_range[1], maxval=-bbox_size[0]/2*scale_range[0]),
-                                         tf.random_uniform([1], minval=-bbox_size[1]/2*scale_range[1], maxval=-bbox_size[1]/2*scale_range[0]),
-                                         tf.random_uniform([1], minval=bbox_size[0]/2*scale_range[0], maxval=bbox_size[0]/2*scale_range[1]),
-                                         tf.random_uniform([1], minval=bbox_size[1]/2*scale_range[0], maxval=bbox_size[1]/2*scale_range[1])]), [-1])
-		expand_bbox = tf.reshape(tf.stack([bbox_center, bbox_center]), [-1]) + rd_expand
-		cropped_image = tf.image.crop_and_resize(tf.expand_dims(image, 0),
-		                                         tf.expand_dims(expand_bbox, 0),
-		                                         [0],
-		                                         tf.constant([height,width], dtype=tf.int32),
-		                                         extrapolation_value=0)[-1] #remove batch
-		#tf.summary.image('image_before_rotate', tf.expand_dims(cropped_image,0))
-		rot_angles = tf.random_uniform([1], minval=rotation_range[0]*3.1416/180, maxval=rotation_range[1]*3.1416/180)
-		rotated_image = tf.contrib.image.rotate(tf.expand_dims(cropped_image, 0), 
-		                                        rot_angles,
-		                                        interpolation='BILINEAR')[-1] #remove batch
-		#tf.summary.image('image_after_rotate', tf.expand_dims(rotated_image,0))
-		rotated_image = tf.image.resize_image_with_crop_or_pad(rotated_image, height, width) 
-		#rotated_image = tf.image.resize_images(tf.expand_dims(rotated_image,0), [height, width])[-1]
-		#tf.summary.image('image_after_rotate_resize', tf.expand_dims(rotated_image,0))
-		lm_num = tf.div(tf.shape(landmarks),tf.constant(2))
-		bb_begin = tf.tile(tf.gather(expand_bbox, [0,1]), lm_num)
-		bb_size = tf.tile(tf.abs(tf.gather(expand_bbox, [2,3]) - tf.gather(expand_bbox, [0,1])), lm_num)
-		distorted_landmarks = (landmarks - bb_begin) / bb_size
-		rot_mat = _get_rot_mat(rot_angles[-1])
-		new_landmarks = tf.matmul(rot_mat, tf.stack([distorted_landmarks[0:136:2], distorted_landmarks[1:137:2], tf.fill([68], 1.)]))
-		new_landmarks = tf.reshape(tf.transpose(new_landmarks)[:,0:2], [-1])
-		
-		return rotated_image, expand_bbox, new_landmarks
-
-def preprocess_for_train(image, height, width, bbox, landmarks,
+def preprocess_for_train(image, height, width, bbox, shape, expression, pose,
                          fast_mode=True,
                          scope=None,
                          add_image_summaries=True):
@@ -268,8 +149,9 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
     width: integer
     bbox: 1-D float Tensor of bounding box, the coordinates are arranged
       as [ymin, xmin, ymax, xmax].
-    landmarks: 1-D float Tensor of landmarks' coordinates, the coordinates are arranged
-      as [y1, x1, y2, x2, ..., y68, x68].
+    shape: 1-D float Tensor of 3DMM shape coefficients.
+    expression: 1-D float Tensor of 3DMM expression coefficients.
+    pose: 1-D float Tensor of 3DMM pose coefficients.
     fast_mode: Optional boolean, if True avoids slower transformations (i.e.
       bi-cubic resizing, random_hue or random_contrast).
     scope: Optional scope for name_scope.
@@ -277,7 +159,7 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
   Returns:
     3-D float Tensor of distorted image used for training with range [0, 255].
   """
-  with tf.name_scope(scope, 'distort_image', [image, height, width, bbox, landmarks]):
+  with tf.name_scope(scope, 'distort_image', [image, height, width, bbox, shape, expression, pose]):
     assert not (bbox is None or landmarks is None)
     
     if image.dtype != tf.float32:
@@ -292,12 +174,14 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
       tf.summary.image('image_with_bounding_boxes', image_with_box)
 
     bbox.set_shape([4])
-    landmarks.set_shape([136]) #TODO: allow non-68 landmarks
+    shape.set_shape([199]) 
+    expression.set_shape([29])
+    pose.set_shape([7])
+    #TODO: unify all components
+    
+    label = tf.concat([shape, expression, pose], axis=0)
 
-    #distorted_image, distorted_bbox = expand_bounding_box_crop_resize(image, height, width, bbox,
-    #                                                                  expand_range=expand_range)
-    #distorted_bounding_box_crop(image, bbox, min_object_covered=min_object_covered)
-    distorted_image, distorted_bbox, distorted_landmarks = rnd_transform_crop(image, height, width, bbox, landmarks)
+    distorted_image, distorted_bbox = expand_bounding_box_crop_resize(image, height, width, bbox)
     
     # Restore the shape since the dynamic slice based upon the bbox_size loses
     # the third dimension.
@@ -308,13 +192,6 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
       tf.summary.image('images_with_distorted_bounding_box',
                        image_with_distorted_box)
 
-    '''#convert landmarks to [0,1]
-    #distorted_bbox = tf.reshape(distorted_bbox, [-1])
-    #distorted_landmarks = tf.reshape(landmarks,[2,-1])
-    bb_begin = tf.tile(tf.gather(distorted_bbox, [0,1]), tf.div(tf.shape(landmarks),tf.constant(2)))
-    bb_size = tf.tile(tf.abs(tf.gather(distorted_bbox, [2,3]) - tf.gather(distorted_bbox, [0,1])), tf.div(tf.shape(landmarks),tf.constant(2)))
-    distorted_landmarks = (landmarks - bb_begin) / bb_size
-    #distorted_landmarks = tf.reshape(distorted_landmarks,[-1])'''
 
 
     if add_image_summaries:
@@ -335,22 +212,13 @@ def preprocess_for_train(image, height, width, bbox, landmarks,
       tf.summary.image('final_distorted_image',
                        tf.expand_dims(distorted_image, 0))
                        
-    #draw landmarks
-    if add_image_summaries:
-      distorted_image_with_lm = draw_landmarks(distorted_image, distorted_landmarks)
-      tf.summary.image('final_distorted_image_with_landmarks',distorted_image_with_lm)
-    
     #change range to [-1,1]
     distorted_image = tf.subtract(distorted_image, 0.5)
     distorted_image = tf.multiply(distorted_image, 2.0)
-    distorted_landmarks = tf.subtract(distorted_landmarks, 0.5)
-    distorted_landmarks = tf.multiply(distorted_landmarks, 2.0)
-    #distorted_image = tf.multiply(distorted_image, 255.0)
-    #distorted_landmarks = tf.multiply(distorted_landmarks, 255.0)
-    return distorted_image, distorted_landmarks
 
-def preprocess_for_eval(image, height, width, bbox, landmarks,
-                         min_object_covered=0.6,
+    return distorted_image, label
+
+def preprocess_for_eval(image, height, width, bbox, shape, expression, pose,
                          fast_mode=True,
                          scope=None):
   """Prepare one image for evaluation.
@@ -373,11 +241,17 @@ def preprocess_for_eval(image, height, width, bbox, landmarks,
   Returns:
     3-D float Tensor of prepared image.
   """
-  with tf.name_scope(scope, 'eval_image', [image, height, width]):
+  with tf.name_scope(scope, 'eval_image', [image, height, width, bbox, shape, expression, pose]):
     if image.dtype != tf.float32:
       image = tf.image.convert_image_dtype(image, dtype=tf.float32)
 
     bbox.set_shape([4])
+    shape.set_shape([199]) 
+    expression.set_shape([29])
+    pose.set_shape([7])
+    #TODO: unify all components
+    
+    label = tf.concat([shape, expression, pose], axis=0)
 
     distorted_image, distorted_bbox = expand_bounding_box_crop_resize(image, height, width, bbox)#distorted_bounding_box_crop(image, bbox, min_object_covered=min_object_covered)
     # Restore the shape since the dynamic slice based upon the bbox_size loses
@@ -390,33 +264,15 @@ def preprocess_for_eval(image, height, width, bbox, landmarks,
     # ratio is not respected. We select a resize method in a round robin
     # fashion based on the thread number.
     # Note that ResizeMethod contains 4 enumerated resizing methods.
-
-    # We select only 1 case for fast_mode bilinear.
-    '''num_resize_cases = 1 if fast_mode else 4
-    distorted_image = apply_with_random_selector(
-        distorted_image,
-        lambda x, method: tf.image.resize_images(x, [height, width], method),
-        num_cases=num_resize_cases)'''
-    landmarks.set_shape([136]) #TODO: allow non-68 landmarks
-    
-    #convert landmarks to [0,1]
-    #distorted_bbox = tf.reshape(distorted_bbox, [-1])
-    #distorted_landmarks = tf.reshape(landmarks,[2,-1])
-    bb_begin = tf.tile(tf.gather(distorted_bbox, [0,1]), tf.div(tf.shape(landmarks),tf.constant(2)))
-    bb_size = tf.tile(tf.abs(tf.gather(distorted_bbox, [2,3]) - tf.gather(distorted_bbox, [0,1])), tf.div(tf.shape(landmarks),tf.constant(2)))
-    distorted_landmarks = (landmarks - bb_begin) / bb_size
-    #distorted_landmarks = tf.reshape(distorted_landmarks,[-1])
     
     #change range to [-1,1]
     distorted_image = tf.subtract(distorted_image, 0.5)
     distorted_image = tf.multiply(distorted_image, 2.0)
-    distorted_landmarks = tf.subtract(distorted_landmarks, 0.5)
-    distorted_landmarks = tf.multiply(distorted_landmarks, 2.0)
 
-    return distorted_image, distorted_landmarks
+    return distorted_image, label
 
 
-def preprocess_image(image, height, width, bbox, label,
+def preprocess_image(image, height, width, bbox, shape, expression, pose,
                      is_training=False,
                      fast_mode=True,
                      add_image_summaries=True):
@@ -445,8 +301,8 @@ def preprocess_image(image, height, width, bbox, label,
     ValueError: if user does not provide bounding box
   """
   if is_training:
-    return preprocess_for_train(image, height, width, bbox, label, fast_mode=fast_mode,
+    return preprocess_for_train(image, height, width, bbox, shape, expression, pose, fast_mode=fast_mode,
                                 add_image_summaries=add_image_summaries)
   else:
-    return preprocess_for_eval(image, height, width, bbox, label)
+    return preprocess_for_eval(image, height, width, bbox, shape, expression, pose)
 

@@ -8,7 +8,7 @@ rem  Where the dataset is saved to.
 SET DATASET_DIR=G:\300W_LP
 
 rem  Fine-tune only the new layers for 2000 steps.
-python train_landmark_regressor.py ^
+python train_image_regressor.py ^
   --train_dir=%TRAIN_DIR% ^
   --dataset_name=landmark_300W_LP ^
   --dataset_split_name=train ^

@@ -23,6 +23,8 @@ from datasets import flowers
 from datasets import imagenet
 from datasets import mnist
 from datasets import landmark_300W_LP
+from datasets import landmark_3d_300W_LP
+from datasets import params_300W_LP
 from datasets import landmark_300VW
 
 datasets_map = {
@@ -32,6 +34,7 @@ datasets_map = {
     'mnist': mnist,
     'landmark_300W_LP': landmark_300W_LP,
     'landmark_3d_300W_LP': landmark_3d_300W_LP,
+    'params_300W_LP': params_300W_LP,
     'landmark_300VW': landmark_300VW,
 }
 
