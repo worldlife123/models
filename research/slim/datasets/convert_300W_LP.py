@@ -88,12 +88,12 @@ class ImageDrawer(object):
                                      tf.image.draw_bounding_boxes(tf.expand_dims(self._image_data, 0), tf.expand_dims(pt2bboxes,0)))
 
   def draw_bbox(self, sess, image_data, bbox, name="image_with_bounding_box"):
-    image = sess.run(self._draw_bbox,
+    image = sess.run(self._draw_bbox(name),
                              feed_dict={self._image_data: image_data, self._bbox_data: bbox})
     return image
 
   def draw_lm(self, sess, image_data, lm, name="image_with_landmarks"):
-    image = sess.run(self._draw_lm,
+    image = sess.run(self._draw_lm(name),
                      feed_dict={self._image_data: image_data, self._lm_data: lm})
     #assert len(image.shape) == 3
     #assert image.shape[2] == 3
