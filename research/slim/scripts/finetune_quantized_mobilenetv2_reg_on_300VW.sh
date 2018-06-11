@@ -1,8 +1,8 @@
 # Where the pre-trained InceptionV1 checkpoint is saved to.
-PRETRAINED_CHECKPOINT_DIR=/tmp/mobilenet_v2_training_quantize_4/model.ckpt-200000
+PRETRAINED_CHECKPOINT_DIR=/tmp/mobilenet_v2_training_quantize_5/model.ckpt-200000
 
 # Where the training (fine-tuned) checkpoint and logs will be saved to.
-TRAIN_DIR=/tmp/mobilenet_v2_training_quantize_4/ft
+TRAIN_DIR=/tmp/mobilenet_v2_training_quantize_5/ft
 
 # Where the dataset is saved to.
 DATASET_DIR=/home/dff/NewDisk/300VW

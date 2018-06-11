@@ -2,7 +2,7 @@
 PRETRAINED_CHECKPOINT_DIR=checkpoints/mobilenet_v1_1.0_224/mobilenet_v1_1.0_224.ckpt
 
 # Where the training (fine-tuned) checkpoint and logs will be saved to.
-TRAIN_DIR=/tmp/mobilenet_v1_training_quantize_2/
+TRAIN_DIR=/tmp/mobilenet_v1_training_quantize/
 
 
 # Where the dataset is saved to.

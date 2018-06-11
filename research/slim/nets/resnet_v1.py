@@ -268,6 +268,8 @@ def resnet_v1_block(scope, base_depth, num_units, stride):
 
 def resnet_v1_50(inputs,
                  num_classes=None,
+                 use_dropout=True,#unused
+                 prediction_fn=tf.contrib.layers.softmax,#unused
                  is_training=True,
                  global_pool=True,
                  output_stride=None,
@@ -292,6 +294,8 @@ resnet_v1_50.default_image_size = resnet_v1.default_image_size
 
 def resnet_v1_101(inputs,
                   num_classes=None,
+                  use_dropout=True,#unused
+                  prediction_fn=tf.contrib.layers.softmax,#unused
                   is_training=True,
                   global_pool=True,
                   output_stride=None,
@@ -316,6 +320,8 @@ resnet_v1_101.default_image_size = resnet_v1.default_image_size
 
 def resnet_v1_152(inputs,
                   num_classes=None,
+                  use_dropout=True,#unused
+                  prediction_fn=tf.contrib.layers.softmax,#unused
                   is_training=True,
                   global_pool=True,
                   output_stride=None,
@@ -340,6 +346,8 @@ resnet_v1_152.default_image_size = resnet_v1.default_image_size
 
 def resnet_v1_200(inputs,
                   num_classes=None,
+                  use_dropout=True,#unused
+                  prediction_fn=tf.contrib.layers.softmax,#unused
                   is_training=True,
                   global_pool=True,
                   output_stride=None,

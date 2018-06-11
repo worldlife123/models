@@ -212,7 +212,7 @@ def rnd_transform_crop(image, height, width, bbox, landmarks,
 
 	    return r
 	
-	with tf.name_scope(scope, 'rnd_transform_crope', [image, height, width, bbox, landmarks]):
+	with tf.name_scope(scope, 'rnd_transform_crop', [image, height, width, bbox, landmarks]):
 		#expand bbox randomly
 		bbox_size = tf.gather(bbox, [2,3]) - tf.gather(bbox, [0,1])
 		bbox_center = (tf.gather(bbox, [2,3]) + tf.gather(bbox, [0,1]))/2

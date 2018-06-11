@@ -32,6 +32,9 @@ import os
 import random
 import sys
 
+import cv2
+import dlib
+
 import tensorflow as tf
 import scipy.io as sio
 
@@ -98,6 +101,16 @@ class ImageDrawer(object):
     #assert len(image.shape) == 3
     #assert image.shape[2] == 3
     return image
+
+def _face_detect(img_filename, ref_bbox):
+    img = cv2.imread(img_filename)
+    dets = dlib_detector(img, 0)
+    for d in dets:
+        det_bbox = [float(d.left())/img.shape[1],float(d.top())/img.shape[0],float(d.right())/img.shape[1],float(d.bottom())/img.shape[0]]
+        if det_bbox[0]>ref_bbox[0] or det_bbox[1]>ref_bbox[1] or det_bbox[2]<ref_bbox[2] or det_bbox[3]<ref_bbox[3]: continue
+        else: return det_bbox
+    
+    return None
 
 def _get_filenames(dataset_dir, split_name):
   """Returns a list of filenames and inferred class names.

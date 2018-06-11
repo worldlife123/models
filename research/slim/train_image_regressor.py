@@ -188,8 +188,7 @@ tf.app.flags.DEFINE_string(
     'as `None`, then the model_name flag is used.')
 
 tf.app.flags.DEFINE_string(
-    'postprocessing_name', None, 'The name of the postprocessing to use. If left '
-    'as `None`, then the model_name flag is used.')
+    'postprocessing_name', 'identity', 'The name of the postprocessing to use.')
 
 tf.app.flags.DEFINE_integer(
     'batch_size', 32, 'The number of samples in each batch.')

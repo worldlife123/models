@@ -112,9 +112,15 @@ bazel run tensorflow/python/tools:freeze_graph -- \
   --input_binary=true --output_graph=${MODEL_FOLDER}/frozen_graph.pb \
   --output_node_names=${OUTPUT_NODE_NAMES}
   
-bazel run tensorflow/python/tools:import_pb_to_tensorboard -- \
-  --log_dir=${MODEL_FOLDER} \
-  --model_dir=${MODEL_FOLDER}/frozen_graph.pb
+#bazel run tensorflow/tools/graph_transforms:transform_graph -- \
+#  --in_graph=${MODEL_FOLDER}/frozen_graph.pb \
+#  --out_graph=${MODEL_FOLDER}/folded_graph.pb \
+#  --inputs=input --outputs=${OUTPUT_NODE_NAMES} \
+#  --transforms='obfuscate_names'
+  
+#bazel run tensorflow/python/tools:import_pb_to_tensorboard -- \
+#  --log_dir=${MODEL_FOLDER} \
+#  --model_dir=${MODEL_FOLDER}/folded_graph.pb
 
 echo "*******"
 echo "Exporting quantized tflite model to ${MODEL_FOLDER}/lite_model_quantized.tflite"
