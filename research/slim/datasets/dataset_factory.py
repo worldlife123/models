@@ -26,6 +26,7 @@ from datasets import landmark_300W_LP
 from datasets import landmark_3d_300W_LP
 from datasets import params_300W_LP
 from datasets import landmark_300VW
+from datasets import landmark_300VW_custom_fd
 
 datasets_map = {
     'cifar10': cifar10,
@@ -36,6 +37,7 @@ datasets_map = {
     'landmark_3d_300W_LP': landmark_3d_300W_LP,
     'params_300W_LP': params_300W_LP,
     'landmark_300VW': landmark_300VW,
+    'landmark_300VW_custom_fd': landmark_300VW_custom_fd,
 }
 
 

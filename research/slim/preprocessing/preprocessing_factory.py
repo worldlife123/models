@@ -25,6 +25,7 @@ from preprocessing import inception_preprocessing
 from preprocessing import lenet_preprocessing
 from preprocessing import vgg_preprocessing
 from preprocessing import face_landmark_preprocessing
+from preprocessing import face_landmark_custom_fd_preprocessing
 from preprocessing import face_mm_preprocessing
 
 slim = tf.contrib.slim
@@ -72,6 +73,7 @@ def get_preprocessing(name, is_training=False):
       'vgg_19': vgg_preprocessing,
       
       'face_landmark': face_landmark_preprocessing,
+      'face_landmark_custom_fd': face_landmark_custom_fd_preprocessing,
       'face_mm': face_mm_preprocessing,
   }
 

@@ -97,9 +97,9 @@ python export_inference_graph.py \
 
 cd ${TENSORFLOW_PATH}
 
-bazel run tensorflow/python/tools:import_pb_to_tensorboard -- \
-  --log_dir=${MODEL_FOLDER} \
-  --model_dir=${MODEL_FOLDER}/unfrozen_graph.pb
+#bazel run tensorflow/python/tools:import_pb_to_tensorboard -- \
+#  --log_dir=${MODEL_FOLDER} \
+#  --model_dir=${MODEL_FOLDER}/unfrozen_graph.pb
 
 OUTPUT_NODE_NAMES=MobilenetV2/Logits/SpatialSqueeze #MobilenetV2/Predictions/Reshape_1
 
